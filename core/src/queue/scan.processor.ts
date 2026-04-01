@@ -158,6 +158,13 @@ export class ScanProcessor extends WorkerHost {
             urlParamsMap.set(canonicalUrl, [
               ...new Set([...existing, param.name]),
             ]);
+          } else if (param.source === 'fragment') {
+            // Include fragment parameters (like __fragment__) discovered by the crawler
+            const { url: canonicalUrl } = canonicalizeTargetUrl(scan.url);
+            const existing = urlParamsMap.get(canonicalUrl) ?? [];
+            urlParamsMap.set(canonicalUrl, [
+              ...new Set([...existing, param.name]),
+            ]);
           }
         }
 
@@ -301,6 +308,23 @@ export class ScanProcessor extends WorkerHost {
             `context failed for ${targetUrl}: ${detail}, skipping`,
           );
           continue;
+        }
+
+        // Fragment params (__fragment__) are client-side only — they never
+        // reflect in server HTTP responses. Inject a synthetic context so the
+        // payload-gen → fuzz → browser-verify pipeline processes them.
+        const FRAGMENT_PARAM = '__fragment__';
+        const DEFAULT_FRAGMENT_CHARS = ['<', '>', '"', "'", '/', '(', ')', ';', '=', '#', ':'];
+        for (const [paramName, ctx] of Object.entries(contexts)) {
+          const ctxObj = ctx as { reflects_in: string };
+          if (paramName === FRAGMENT_PARAM && ctxObj.reflects_in === 'none') {
+            (ctx as Record<string, unknown>).reflects_in = 'attribute'; // Attribute covers more client-side injection scenarios
+            (ctx as Record<string, unknown>).allowed_chars = DEFAULT_FRAGMENT_CHARS;
+            (ctx as Record<string, unknown>).context_confidence = 0.75;
+            this.logger.log(
+              `injected synthetic attribute context for ${FRAGMENT_PARAM} on ${targetUrl}`,
+            );
+          }
         }
 
         // skip if no reflections found for this URL

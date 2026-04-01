@@ -293,19 +293,20 @@ async def _attempt_user_interactions(page, payload: str, param: str) -> None:
         payload_lower = payload.lower()
 
         # Click javascript: links when present (Level 5 style).
-        if "javascript:" in payload_lower:
-            try:
-                await page.evaluate("""() => {
-                    const anchors = Array.from(document.querySelectorAll('a[href]'));
-                    for (const a of anchors) {
-                        const href = (a.getAttribute('href') || '').toLowerCase();
-                        if (href.startsWith('javascript:')) {
-                            a.click();
-                        }
+        # We click them regardless of payload content because the reflection 
+        # might just be the payload part of href="javascript:PAYLOAD"
+        try:
+            await page.evaluate("""() => {
+                const anchors = Array.from(document.querySelectorAll('a[href]'));
+                for (const a of anchors) {
+                    const href = (a.getAttribute('href') || '').toLowerCase();
+                    if (href.startsWith('javascript:')) {
+                        a.click();
                     }
-                }""")
-            except Exception:
-                pass
+                }
+            }""")
+        except Exception:
+            pass
 
         # Click elements likely to contain inline click handlers.
         if any(x in payload_lower for x in ["onclick", "onmousedown", "onmouseup"]):

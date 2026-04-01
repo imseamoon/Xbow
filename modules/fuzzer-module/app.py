@@ -209,6 +209,82 @@ async def test(request: FuzzRequest):
         f"{' STORED_MODE' if stored_mode else ''}"
     )
 
+    # ── Fragment (hash) injection pathway ────────────────────────────
+    # Fragment payloads target client-side sinks (location.hash → innerHTML,
+    # jQuery .html(), createElement('script').src, etc.).  The server never
+    # sees the fragment so HTTP send + reflection check are pointless.
+    # Instead, send directly to the browser verifier which navigates to
+    # url#payload and detects alert/confirm/prompt dialogs.
+    FRAGMENT_PARAM = "__fragment__"
+    fragment_payloads = [p for p in payloads if p.get("target_param") == FRAGMENT_PARAM]
+    non_fragment_payloads = [p for p in payloads if p.get("target_param") != FRAGMENT_PARAM]
+
+    if fragment_payloads:
+        logger.info(
+            f"fragment injection: {len(fragment_payloads)} payloads targeting location.hash"
+        )
+        fragment_results: list[FuzzResult] = []
+
+        # DOM-only scan on the base page to report static sink/source findings
+        try:
+            fetched = await fetch_url(url=url, timeout_ms=timeout_ms)
+            if fetched.response_body:
+                scan_result = scan_response_body(fetched.response_body, url)
+                if scan_result.findings:
+                    dom_findings = findings_to_results(scan_result.findings, url)
+                    for dr in dom_findings:
+                        fragment_results.append(FuzzResult(**dr))
+        except Exception as e:
+            logger.warning(f"fragment DOM scan failed: {e}")
+
+        # Browser verification — navigate to url#payload and detect execution
+        browser_entries = [
+            {"payload": p.get("payload", ""), "target_param": FRAGMENT_PARAM}
+            for p in fragment_payloads
+        ]
+        verify_results = await verify_payloads(
+            url=url,
+            reflected_results=browser_entries,
+            timeout_ms=timeout_ms,
+            concurrency=3,
+        )
+        seen_frag: set[str] = set()
+        for vr in verify_results:
+            key = f"{vr.payload}:{vr.target_param}"
+            if key in seen_frag:
+                continue
+            seen_frag.add(key)
+            fragment_results.append(FuzzResult(
+                payload=vr.payload,
+                target_param=vr.target_param,
+                reflected=False,
+                executed=vr.executed,
+                vuln=vr.executed,
+                type="dom_xss" if vr.executed else "",
+                evidence={
+                    "response_code": 200,
+                    "reflection_position": "fragment",
+                    "browser_alert_triggered": vr.dialog_triggered,
+                    "dialog_message": vr.dialog_message,
+                    "severity": "high" if vr.executed else "medium",
+                    "confidence": "high" if vr.dialog_triggered else "medium",
+                },
+            ))
+
+        frag_vulns = sum(1 for r in fragment_results if r.vuln)
+        logger.info(
+            f"fragment injection complete: {frag_vulns}/{len(fragment_results)} vulns confirmed"
+        )
+
+        # If there are no non-fragment payloads, return fragment results directly
+        if not non_fragment_payloads:
+            return FuzzResponse(results=fragment_results)
+
+        # Otherwise, continue with the rest of the pipeline for non-fragment payloads
+        payloads = non_fragment_payloads
+    else:
+        fragment_results = []
+
     # ── Stored XSS pathway ───────────────────────────────────────────
     if stored_mode and store_url and display_url:
         logger.info(
@@ -546,6 +622,10 @@ async def test(request: FuzzRequest):
         f"fuzz complete: {len(final_results)} results, "
         f"{vuln_count} vulnerabilities confirmed"
     )
+
+    # merge fragment pipeline results (if any)
+    if fragment_results:
+        final_results.extend(fragment_results)
     
     # deduplicate similar vulnerabilities to reduce noise
     final_results = _deduplicate_similar_vulns(final_results)

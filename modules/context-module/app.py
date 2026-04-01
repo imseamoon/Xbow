@@ -134,7 +134,13 @@ async def analyze(req: AnalyzeRequest) -> dict[str, ParamContext]:
         ai_confidence = ai_result["confidence"]
 
         # step 4: consensus — prefer ai if confident, else dom, else regex
-        if ai_confidence >= 0.8:
+        # Exception: DOM-based js_string and url contexts are highly specific and structurally 
+        # accurate (e.g. from event handlers like onload). Never let AI override them to a 
+        # generic "attribute".
+        if dom_context in ("js_string", "url") and ai_context == "attribute":
+            final_context = dom_context
+            final_confidence = max(0.9, ai_confidence)
+        elif ai_confidence >= 0.8:
             final_context = ai_context
             final_confidence = ai_confidence
         elif dom_context != "none":

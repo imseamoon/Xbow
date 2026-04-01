@@ -160,6 +160,23 @@ async def _send_one(
     async with semaphore:
         start = time.monotonic()
         try:
+            # Fragments never reach the server. Return a dummy response.
+            # (By design! The browser handles URL fragments locally. Sending a GET
+            # request with ?__fragment__=X is useless because the server doesn't act
+            # on it. The actual testing happens in browser_verifier.py where the Chrome
+            # instance navigates to url#payload)
+            if param == FRAGMENT_PARAM:
+                return SendResult(
+                    payload=payload,
+                    target_param=param,
+                    method=method,
+                    status_code=200,
+                    response_body="",
+                    response_headers={},
+                    elapsed_ms=0,
+                    url=url,
+                )
+
             if method.upper() == "GET":
                 injected_url = _inject_param_get(url, param, payload)
                 resp = await client.get(injected_url)

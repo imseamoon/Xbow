@@ -24,9 +24,10 @@ CONTEXT_TO_LABELS: dict[str, list[str]] = {
         "event_handler",
         "generic",
     ],
-    "js_string": ["script_injection", "template_injection"],
+    "js_string": ["script_injection", "template_injection", "event_handler"],
     "js_block": ["script_injection", "dom_sink", "template_injection"],
     "url": ["js_uri"],
+    "script_src": ["js_uri", "dom_sink"],
     "none": [],
 }
 

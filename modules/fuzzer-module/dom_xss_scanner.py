@@ -188,6 +188,7 @@ class DomXssFinding:
     source_name: str
     script_url: str
     confidence: str = "high"  # high, medium, low
+    suggested_payload: str = "" # Best-guess payload to test this sink
 
 
 @dataclass
@@ -482,6 +483,17 @@ def _scan_single_script(content: str, script_url: str) -> list[DomXssFinding]:
                 if not has_source:
                     continue
 
+                # Determine suggested payload based on sink type
+                suggested_payload = ""
+                if sink_info["type"] == "execution":
+                    suggested_payload = "alert(1)"
+                elif sink_info["type"] == "html":
+                    suggested_payload = "<img src=x onerror=alert(1)>"
+                elif sink_info["type"] == "js_uri":
+                    suggested_payload = "javascript:alert(1)"
+                elif sink_info["type"] == "url":
+                    suggested_payload = "https://example.com"
+
                 findings.append(DomXssFinding(
                     sink_name=sink_name,
                     sink_type=sink_info["type"],
@@ -494,6 +506,7 @@ def _scan_single_script(content: str, script_url: str) -> list[DomXssFinding]:
                     source_name=source_name,
                     script_url=script_url,
                     confidence=confidence,
+                    suggested_payload=suggested_payload,
                 ))
 
     return findings
