@@ -4,6 +4,7 @@ analyzes reflection contexts for xss parameters using probing, char fuzzing, and
 """
 
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -15,6 +16,25 @@ from reflection_analyzer import analyze_reflection, get_primary_context
 from char_fuzzer import fuzz_chars
 from html_parser import get_dom_context
 from ai_classifier import AIClassifier
+
+FRAGMENT_PARAM = "__fragment__"
+DEFAULT_FRAGMENT_ALLOWED_CHARS = ["<", ">", '"', "'", "/", "(", ")", ";", "=", "#", ":"]
+
+
+def _has_hash_sink_signals(body: str) -> bool:
+    """detect common DOM patterns where fragment-based payloads are consumed."""
+    if not body:
+        return False
+    patterns = [
+        r"location\.hash",
+        r"hashchange",
+        r"\.html\s*\(",
+        r"innerHTML\s*=",
+        r"document\.write\s*\(",
+        r"createElement\s*\(\s*['\"]script['\"]\s*\)",
+        r"\.src\s*=",
+    ]
+    return any(re.search(p, body, flags=re.IGNORECASE) for p in patterns)
 
 # ── logging ─────────────────────────────────────────────────
 logging.basicConfig(
@@ -85,6 +105,18 @@ async def analyze(req: AnalyzeRequest) -> dict[str, ParamContext]:
         # step 2: check if marker is reflected
         reflections = analyze_reflection(body, marker)
         if not reflections:
+            # Fragment/hash payloads are client-side only; they are never reflected
+            # by server HTTP responses. If script hints exist, mark as fuzzable.
+            if param == FRAGMENT_PARAM and _has_hash_sink_signals(body):
+                results[param] = ParamContext(
+                    reflects_in="html_body",
+                    allowed_chars=DEFAULT_FRAGMENT_ALLOWED_CHARS,
+                    context_confidence=0.75,
+                )
+                logger.info(
+                    f"param={param} heuristic_context=html_body confidence=0.75 (hash sink signals)"
+                )
+                continue
             results[param] = ParamContext()
             continue
 
@@ -113,7 +145,11 @@ async def analyze(req: AnalyzeRequest) -> dict[str, ParamContext]:
             final_confidence = max(0.5, ai_confidence)
 
         # step 5: fuzz which special chars survive
-        allowed_chars = await fuzz_chars(req.url, param)
+        # char fuzzing is query-based and does not apply to synthetic fragment param
+        if param == FRAGMENT_PARAM:
+            allowed_chars = DEFAULT_FRAGMENT_ALLOWED_CHARS
+        else:
+            allowed_chars = await fuzz_chars(req.url, param)
 
         results[param] = ParamContext(
             reflects_in=final_context,

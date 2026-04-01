@@ -25,6 +25,7 @@ DEFAULT_HEADERS = {
     "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
 }
+FRAGMENT_PARAM = "__fragment__"
 
 # methods to try when injecting
 INJECT_METHODS = ["GET", "POST"]
@@ -321,6 +322,9 @@ def _extract_csrf(html: str) -> str:
 def _inject_param_get(url: str, param: str, value: str) -> str:
     """inject payload value into a url query parameter"""
     parsed = urlparse(url)
+    if param == FRAGMENT_PARAM:
+        return urlunparse(parsed._replace(fragment=value))
+
     params = parse_qs(parsed.query, keep_blank_values=True)
     params[param] = [value]
     new_query = urlencode(params, doseq=True)

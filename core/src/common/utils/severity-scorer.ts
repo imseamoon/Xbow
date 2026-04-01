@@ -12,7 +12,7 @@ import { VulnSeverity } from '../interfaces/vuln.interface';
  * Total → Severity: 8+ CRITICAL, 6-7 HIGH, 4-5 MEDIUM, 0-3 LOW
  *
  * Override rules applied after scoring:
- *   1. HASH_SOURCE_LOW_CAP:          source=location.hash → max LOW
+ *   1. HASH_SOURCE_MEDIUM_CAP:       source=location.hash → max MEDIUM
  *   2. EVAL_SINK_MINIMUM_HIGH:       sink=eval            → min HIGH
  *   3. CONFIRMED_SENSITIVE_EXEC:     executed + document.cookie → CRITICAL
  *   4. WAF_BYPASS_MEDIUM_MINIMUM:    reflected + % + exactMatch → min MEDIUM
@@ -149,11 +149,11 @@ function applyOverrides(
   const src = (input.source ?? '').toLowerCase();
   const sink = (input.sink ?? '').toLowerCase();
 
-  // 1. HASH_SOURCE_LOW_CAP: location.hash source → max LOW
+  // 1. HASH_SOURCE_MEDIUM_CAP: location.hash source → max MEDIUM
   if (src === 'location.hash' || src === 'hash') {
-    const capped = atMost(s, VulnSeverity.LOW);
+    const capped = atMost(s, VulnSeverity.MEDIUM);
     if (capped !== s) {
-      applied.push('HASH_SOURCE_LOW_CAP');
+      applied.push('HASH_SOURCE_MEDIUM_CAP');
       s = capped;
     }
   }

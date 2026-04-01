@@ -40,6 +40,7 @@ export class DomAnalyzerService {
   extractParams(url: string, html: string): DiscoveredParam[] {
     const params: DiscoveredParam[] = [];
     const seen = new Set<string>();
+    const FRAGMENT_PARAM = '__fragment__';
 
     // extract query params from url
     try {
@@ -58,6 +59,13 @@ export class DomAnalyzerService {
     try {
       const u = new URL(url);
       if (u.hash) {
+        // Always expose whole-fragment injection for sinks that consume raw hash
+        // (e.g. location.hash, substring/hash routing, dynamic script include).
+        if (!seen.has(`fragment:${FRAGMENT_PARAM}`)) {
+          seen.add(`fragment:${FRAGMENT_PARAM}`);
+          params.push({ name: FRAGMENT_PARAM, source: 'fragment', method: 'GET' });
+        }
+
         const fragParams = new URLSearchParams(u.hash.slice(1));
         for (const name of fragParams.keys()) {
           if (!seen.has(`fragment:${name}`)) {
@@ -68,6 +76,13 @@ export class DomAnalyzerService {
       }
     } catch {
       // skip
+    }
+
+    // If the page script references location.hash, create a synthetic fragment
+    // parameter even when current URL has no hash yet.
+    if (/location\.hash/i.test(html) && !seen.has(`fragment:${FRAGMENT_PARAM}`)) {
+      seen.add(`fragment:${FRAGMENT_PARAM}`);
+      params.push({ name: FRAGMENT_PARAM, source: 'fragment', method: 'GET' });
     }
 
     // extract form fields from html

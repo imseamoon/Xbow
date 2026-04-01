@@ -2,71 +2,79 @@
 
 import { ScanStatus, VulnSeverity } from "@/lib/types";
 
-/* ── status badge ───────────────────────────────────────────── */
+/* ── Status Badge ───────────────────────────────────────────── */
 
 const statusColors: Record<string, string> = {
-  [ScanStatus.PENDING]: "bg-zinc-700 text-zinc-200",
-  [ScanStatus.CRAWLING]: "bg-blue-600/20 text-blue-400",
-  [ScanStatus.ANALYZING]: "bg-violet-600/20 text-violet-400",
-  [ScanStatus.GENERATING]: "bg-amber-600/20 text-amber-400",
-  [ScanStatus.FUZZING]: "bg-orange-600/20 text-orange-400",
-  [ScanStatus.REPORTING]: "bg-cyan-600/20 text-cyan-400",
-  [ScanStatus.DONE]: "bg-emerald-600/20 text-emerald-400",
-  [ScanStatus.FAILED]: "bg-red-600/20 text-red-400",
-  [ScanStatus.CANCELLED]: "bg-zinc-600/20 text-zinc-400",
+  [ScanStatus.PENDING]: "text-zinc-500 border-zinc-800 bg-zinc-900/10",
+  [ScanStatus.CRAWLING]: "text-blue-400 border-blue-500/20 bg-blue-500/5",
+  [ScanStatus.ANALYZING]: "text-violet-400 border-violet-500/20 bg-violet-500/5",
+  [ScanStatus.GENERATING]: "text-amber-400 border-amber-500/20 bg-amber-500/5",
+  [ScanStatus.FUZZING]: "text-orange-400 border-orange-500/20 bg-orange-500/5",
+  [ScanStatus.REPORTING]: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5",
+  [ScanStatus.DONE]: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
+  [ScanStatus.FAILED]: "text-red-400 border-red-500/20 bg-red-500/5",
+  [ScanStatus.CANCELLED]: "text-zinc-600 border-zinc-900 bg-transparent",
 };
 
 export function StatusBadge({ status }: { status: ScanStatus }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[status] ?? "bg-zinc-700 text-zinc-300"}`}
+      className={`inline-flex items-center rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+        statusColors[status] ?? "text-zinc-500 border-zinc-800"
+      }`}
     >
       {status}
     </span>
   );
 }
 
-/* ── severity badge ─────────────────────────────────────────── */
+/* ── Severity Badge ─────────────────────────────────────────── */
 
 const severityColors: Record<string, string> = {
-  [VulnSeverity.CRITICAL]: "bg-red-600 text-white",
-  [VulnSeverity.HIGH]: "bg-orange-600 text-white",
-  [VulnSeverity.MEDIUM]: "bg-amber-500 text-black",
-  [VulnSeverity.LOW]: "bg-yellow-400 text-black",
-  [VulnSeverity.INFO]: "bg-sky-500/20 text-sky-400",
+  [VulnSeverity.CRITICAL]: "bg-red-500/20 text-red-400 border-red-500/30",
+  [VulnSeverity.HIGH]: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  [VulnSeverity.MEDIUM]: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  [VulnSeverity.LOW]: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  [VulnSeverity.INFO]: "bg-blue-500/20 text-blue-400 border-blue-500/30",
 };
 
 export function SeverityBadge({ severity }: { severity: VulnSeverity }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${severityColors[severity] ?? "bg-zinc-700 text-zinc-300"}`}
+      className={`inline-flex items-center rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+        severityColors[severity] ?? "text-zinc-500 border-zinc-800"
+      }`}
     >
       {severity}
     </span>
   );
 }
 
-/* ── progress bar ───────────────────────────────────────────── */
+/* ── Progress Bar ───────────────────────────────────────────── */
 
 export function ProgressBar({
   value,
   label,
+  active = false,
 }: {
   value: number;
   label?: string;
+  active?: boolean;
 }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <div className="w-full">
       {label && (
-        <div className="mb-1 flex justify-between text-xs text-zinc-400">
+        <div className="mb-1 flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500">
           <span>{label}</span>
           <span>{clamped}%</span>
         </div>
       )}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-900 border border-white/5">
         <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+          className={`h-full bg-emerald-500 transition-all duration-700 ease-out ${
+            active ? "animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" : ""
+          }`}
           style={{ width: `${clamped}%` }}
         />
       </div>
@@ -74,7 +82,7 @@ export function ProgressBar({
   );
 }
 
-/* ── card ────────────────────────────────────────────────────── */
+/* ── Card ─────────────────────────────────────────────────── */
 
 export function Card({
   children,
@@ -84,15 +92,13 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div
-      className={`rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 ${className}`}
-    >
+    <div className={`technical-border bg-zinc-950/20 p-6 ${className}`}>
       {children}
     </div>
   );
 }
 
-/* ── stat card ──────────────────────────────────────────────── */
+/* ── Stat Card (Legacy Compatibility) ────────────────────────── */
 
 export function StatCard({
   label,
@@ -104,16 +110,20 @@ export function StatCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <Card className="flex items-center gap-4">
-      {icon && (
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400">
-          {icon}
-        </div>
-      )}
-      <div>
-        <p className="text-sm text-zinc-400">{label}</p>
-        <p className="text-2xl font-bold text-zinc-100">{value}</p>
+    <div className="technical-border bg-zinc-900/20 p-5 group transition-all hover:bg-zinc-900/40">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 group-hover:text-zinc-400 transition-colors">
+          {label}
+        </span>
+        {icon && (
+          <div className="text-zinc-700 transition-colors group-hover:text-emerald-500">
+            {icon}
+          </div>
+        )}
       </div>
-    </Card>
+      <div className="text-2xl font-black tracking-tight text-zinc-100 font-mono">
+        {value}
+      </div>
+    </div>
   );
 }

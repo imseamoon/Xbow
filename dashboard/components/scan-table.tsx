@@ -26,71 +26,91 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+    <div className="overflow-hidden border border-white/5 bg-[#080808]">
+      <table className="w-full text-left text-sm border-collapse">
         <thead>
-          <tr className="border-b border-zinc-800 text-zinc-400">
-            <th className="px-4 py-3 font-medium">Target</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Progress</th>
-            <th className="px-4 py-3 font-medium">Vulns</th>
-            <th className="px-4 py-3 font-medium">Started</th>
-            <th className="px-4 py-3 font-medium" />
+          <tr className="border-b border-white/5 bg-white/[0.02] text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+            <th className="px-6 py-3">Asset Path</th>
+            <th className="px-6 py-3 text-center">Protocol Status</th>
+            <th className="px-6 py-3">Audit Stream</th>
+            <th className="px-6 py-3 text-center">Threats</th>
+            <th className="px-6 py-3 text-right">Timestamp</th>
+            <th className="px-6 py-3" />
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/5">
           {scans.map((scan) => (
             <tr
               key={scan.id}
-              className="border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/30"
+              className="group transition-all duration-150 hover:bg-emerald-500/[0.02]"
             >
-              <td className="px-4 py-3">
-                <span className="font-mono text-xs text-zinc-300">
+              <td className="px-6 py-4">
+                <span className="font-mono text-[11px] font-medium text-zinc-400 group-hover:text-emerald-400 transition-colors">
                   {scan.url}
                 </span>
               </td>
-              <td className="px-4 py-3">
-                <StatusBadge status={scan.status} />
+              <td className="px-6 py-4">
+                <div className="flex justify-center">
+                  <StatusBadge status={scan.status} />
+                </div>
               </td>
-              <td className="w-40 px-4 py-3">
+              <td className="w-48 px-6 py-4">
                 {scan.status !== ScanStatus.DONE &&
                 scan.status !== ScanStatus.FAILED &&
                 scan.status !== ScanStatus.CANCELLED ? (
-                  <ProgressBar value={scan.progress} />
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-600">
+                      <span>Probing...</span>
+                      <span>{Math.round(scan.progress)}%</span>
+                    </div>
+                    <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-500 ease-out shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                        style={{ width: `${scan.progress}%` }}
+                      />
+                    </div>
+                  </div>
                 ) : (
-                  <span className="text-xs text-zinc-500">—</span>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${scan.status === ScanStatus.DONE ? "text-emerald-500/60" : "text-zinc-700"}`}>
+                    {scan.status === ScanStatus.DONE ? "Audit Sealed" : "Terminated"}
+                  </span>
                 )}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-6 py-4 text-center">
                 <span
-                  className={`text-sm font-semibold ${(scan.vulns?.length ?? 0) > 0 ? "text-red-400" : "text-zinc-500"}`}
+                  className={`inline-flex items-center justify-center min-w-[20px] h-4 rounded text-[9px] font-black tracking-tighter ring-1 transition-all ${
+                    (scan.vulns?.length ?? 0) > 0 
+                      ? "bg-red-500/10 text-red-500 ring-red-500/30" 
+                      : "bg-zinc-900 text-zinc-600 ring-white/5"
+                  }`}
                 >
                   {scan.vulns?.length ?? 0}
                 </span>
               </td>
-              <td className="px-4 py-3 text-xs text-zinc-500">
-                {formatDate(scan.createdAt)}
+              <td className="px-6 py-4 text-right">
+                <span className="font-mono text-[10px] text-zinc-600">
+                  {formatDate(scan.createdAt).split(",")[1]}
+                </span>
               </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
+              <td className="px-6 py-4 text-right">
+                <div className="flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link
                     href={`/scan/${scan.id}`}
-                    className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300"
+                    className="text-zinc-500 hover:text-emerald-400 transition-colors"
                   >
-                    View <ExternalLink size={12} />
+                    <ExternalLink size={14} />
                   </Link>
                   <button
                     onClick={async () => {
-                      if (!confirm("Delete this scan and its results?")) return;
+                      if (!confirm("Confirm data erasure?")) return;
                       try {
                         await deleteScan(scan.id);
                         onDelete?.(scan.id);
                       } catch { /* ignore */ }
                     }}
-                    className="inline-flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors"
-                    title="Delete scan"
+                    className="text-zinc-800 hover:text-red-500 transition-colors"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </td>

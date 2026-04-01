@@ -11,6 +11,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 MARKER_PREFIX = "rs0x"
+FRAGMENT_PARAM = "__fragment__"
 
 
 def generate_marker(param: str, salt: str = "redsentinel") -> str:
@@ -23,6 +24,9 @@ def generate_marker(param: str, salt: str = "redsentinel") -> str:
 def build_probe_url(url: str, param: str, marker: str) -> str:
     """replace or append the param value with the probe marker"""
     parsed = urlparse(url)
+    if param == FRAGMENT_PARAM:
+        return urlunparse(parsed._replace(fragment=marker))
+
     qs = parse_qs(parsed.query, keep_blank_values=True)
     qs[param] = [marker]
     new_query = urlencode(qs, doseq=True)
@@ -71,7 +75,7 @@ async def inject_probes(
                 logger.warning(f"probe GET failed param={param}: {e}")
 
             # Also try POST (form body) — many form params only reflect via POST
-            if post_globally_supported is not False:
+            if param != FRAGMENT_PARAM and post_globally_supported is not False:
                 try:
                     # Parse the base URL without the probe query string
                     parsed = urlparse(url)

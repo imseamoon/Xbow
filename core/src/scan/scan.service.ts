@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import { randomUUID as uuidv4 } from 'crypto';
 import { CreateScanDto } from './dto/create-scan.dto';
 import {
@@ -27,7 +27,10 @@ export class ScanService {
    * This is fine — dedup only matters during a single scan run; if the
    * process restarts mid-scan, BullMQ will re-queue the job anyway.
    */
-  private readonly vulnKeys = new Map<string, Set<string>>();
+  private readonly vulnKeys = new Map<
+    string,
+    Map<string, { id: string; score: number }>
+  >();
 
   constructor(
     @InjectRepository(ScanEntity)
@@ -57,7 +60,7 @@ export class ScanService {
       updatedAt: now,
     });
     const saved = await this.scanRepo.save(entity);
-    this.vulnKeys.set(id, new Set());
+    this.vulnKeys.set(id, new Map());
     this.logger.log(`scan created id=${id} url=${saved.url}`);
     return this.toRecord(saved);
   }
@@ -131,21 +134,39 @@ export class ScanService {
   async addVuln(scanId: string, vuln: Vuln): Promise<boolean> {
     await this.findOne(scanId);
     const key = this.buildVulnKey(vuln);
-    const seen = this.vulnKeys.get(scanId) ?? new Set<string>();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    this.vulnKeys.set(scanId, seen);
+    const seen =
+      this.vulnKeys.get(scanId) ??
+      new Map<string, { id: string; score: number }>();
 
     // PostgreSQL rejects null bytes (\x00) in text columns.
     // XSS payloads legitimately contain them (e.g. <\x00a …>) so strip
     // before persisting rather than letting the INSERT fail.
     const stripNullBytes = (s: string | undefined): string | undefined =>
-      s == null ? s : s.replace(/\x00/g, '');
+      s == null ? s : s.split('\u0000').join('');
+
+    const sanitizeUnknown = (value: unknown): unknown => {
+      if (typeof value === 'string') {
+        return value.split('\u0000').join('').split('\\u0000').join('');
+      }
+      if (Array.isArray(value)) {
+        return value.map((item) => sanitizeUnknown(item));
+      }
+      if (value && typeof value === 'object') {
+        const input = value as Record<string, unknown>;
+        const output: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(input)) {
+          output[k] = sanitizeUnknown(v);
+        }
+        return output;
+      }
+      return value;
+    };
+
+    const sanitizeEvidence = (value: Vuln['evidence']): Vuln['evidence'] =>
+      sanitizeUnknown(value) as Vuln['evidence'];
 
     const sanitizedEvidence =
-      vuln.evidence != null
-        ? JSON.parse(JSON.stringify(vuln.evidence).replace(/\\u0000/g, '').replace(/\x00/g, ''))
-        : vuln.evidence;
+      vuln.evidence != null ? sanitizeEvidence(vuln.evidence) : vuln.evidence;
 
     const entity = this.vulnRepo.create({
       id: vuln.id ?? uuidv4(),
@@ -160,7 +181,39 @@ export class ScanService {
       evidence: sanitizedEvidence,
       discoveredAt: vuln.discoveredAt ?? new Date(),
     });
+
+    const score = this.scoreVuln(vuln);
+    const existing = seen.get(key);
+
+    if (existing) {
+      // Keep the best representative finding for this dedup key.
+      // This avoids reports showing weaker payloads (e.g. non-alert SVG)
+      // when a stronger, confirmed payload exists for the same source/sink.
+      if (score <= existing.score) return false;
+
+      await this.vulnRepo.update(
+        { id: existing.id, scanId },
+        {
+          url: entity.url,
+          param: entity.param,
+          payload: entity.payload,
+          type: entity.type,
+          severity: entity.severity,
+          reflected: entity.reflected,
+          executed: entity.executed,
+          evidence: entity.evidence,
+          discoveredAt: entity.discoveredAt,
+        },
+      );
+
+      seen.set(key, { id: existing.id, score });
+      this.vulnKeys.set(scanId, seen);
+      return false;
+    }
+
     await this.vulnRepo.save(entity);
+    seen.set(key, { id: entity.id, score });
+    this.vulnKeys.set(scanId, seen);
     return true;
   }
 
@@ -232,7 +285,9 @@ export class ScanService {
   private buildVulnKey(v: Vuln): string {
     const page = this.normalizeUrlForDedup(String(v.url ?? '').trim());
     const source = String(v.evidence?.source ?? 'URLSearchParams').trim();
-    const sink = String(v.evidence?.sink ?? v.evidence?.reflectionPosition ?? 'attribute').trim();
+    const sink = String(
+      v.evidence?.sink ?? v.evidence?.reflectionPosition ?? 'attribute',
+    ).trim();
     return `${page}::${source}::${sink}`;
   }
 
@@ -252,5 +307,28 @@ export class ScanService {
 
   private isIdle(scan: ScanRecord): boolean {
     return scan.status === ScanStatus.PENDING;
+  }
+
+  private scoreVuln(v: Vuln): number {
+    const severityRank: Record<string, number> = {
+      LOW: 1,
+      MEDIUM: 2,
+      HIGH: 3,
+      CRITICAL: 4,
+    };
+    const sev = severityRank[String(v.severity ?? '').toUpperCase()] ?? 1;
+    const evidence = (v.evidence ?? {}) as unknown as Record<string, unknown>;
+    const alertTriggered = Boolean(evidence.browserAlertTriggered);
+
+    let score = sev;
+    if (v.reflected) score += 5;
+    if (v.executed) score += 50;
+    if (alertTriggered) score += 20;
+
+    const p = String(v.payload ?? '').toLowerCase();
+    if (p.includes('document.cookie') || p.includes('localstorage')) score += 5;
+    if (p.includes('onerror=') || p.includes('onload=')) score += 2;
+
+    return score;
   }
 }

@@ -29,6 +29,7 @@ DEFAULT_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
 }
+FRAGMENT_PARAM = "__fragment__"
 
 
 @dataclass
@@ -214,6 +215,10 @@ async def _verify_one(
             except Exception:
                 pass  # non-fatal — DOMContentLoaded is enough for XSS detection
 
+            # actively trigger user-driven vectors (onclick/onfocus/javascript: links)
+            # so click-dependent payloads can be confirmed.
+            await _attempt_user_interactions(page, payload, param)
+
             # brief wait for any delayed js execution
             await page.wait_for_timeout(300)
 
@@ -280,6 +285,81 @@ async def _count_injected_elements(page, payload: str) -> int:
         return count
     except Exception:
         return 0
+
+
+async def _attempt_user_interactions(page, payload: str, param: str) -> None:
+    """best-effort simulation of basic user actions to trigger event-based payloads."""
+    try:
+        payload_lower = payload.lower()
+
+        # Click javascript: links when present (Level 5 style).
+        if "javascript:" in payload_lower:
+            try:
+                await page.evaluate("""() => {
+                    const anchors = Array.from(document.querySelectorAll('a[href]'));
+                    for (const a of anchors) {
+                        const href = (a.getAttribute('href') || '').toLowerCase();
+                        if (href.startsWith('javascript:')) {
+                            a.click();
+                        }
+                    }
+                }""")
+            except Exception:
+                pass
+
+        # Click elements likely to contain inline click handlers.
+        if any(x in payload_lower for x in ["onclick", "onmousedown", "onmouseup"]):
+            try:
+                await page.evaluate("""() => {
+                    const clickable = document.querySelectorAll('[onclick], [onmousedown], [onmouseup], button, a, input[type="button"], input[type="submit"]');
+                    for (const el of clickable) {
+                        if (typeof el.click === 'function') el.click();
+                    }
+                }""")
+            except Exception:
+                pass
+
+        # Focus/blur events often need explicit focus to execute.
+        if any(x in payload_lower for x in ["onfocus", "onblur", "onfocusin", "onfocusout"]):
+            try:
+                await page.evaluate("""() => {
+                    const focusables = document.querySelectorAll('[onfocus], [onblur], [onfocusin], [onfocusout], input, textarea, select, button, a[href], [tabindex]');
+                    for (const el of focusables) {
+                        if (typeof el.focus === 'function') {
+                            el.focus();
+                            if (typeof el.blur === 'function') el.blur();
+                        }
+                    }
+                }""")
+            except Exception:
+                pass
+
+        # Hover and keyboard-driven handlers.
+        if any(x in payload_lower for x in ["onmouseover", "onmouseenter", "onkeydown", "onkeyup", "onkeypress"]):
+            try:
+                await page.evaluate("""() => {
+                    const candidates = document.querySelectorAll('[onmouseover], [onmouseenter], [onkeydown], [onkeyup], [onkeypress], *');
+                    for (const el of candidates) {
+                        el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                        el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                        el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+                        el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+                    }
+                }""")
+            except Exception:
+                pass
+
+        # Generic fallback: try Enter key once to trigger default actions.
+        try:
+            await page.keyboard.press("Enter")
+        except Exception:
+            pass
+
+        # Give handlers a short window to execute.
+        await page.wait_for_timeout(400)
+    except Exception:
+        # best-effort helper: verification should not fail due to interaction attempts
+        return
 
 def _payload_suggests_execution(payload: str) -> bool:
     """
@@ -527,6 +607,9 @@ async def _verify_stored_one(
 def _inject_param(url: str, param: str, value: str) -> str:
     """inject payload into url query parameter"""
     parsed = urlparse(url)
+    if param == FRAGMENT_PARAM:
+        return urlunparse(parsed._replace(fragment=value))
+
     params = parse_qs(parsed.query, keep_blank_values=True)
     params[param] = [value]
     new_query = urlencode(params, doseq=True)

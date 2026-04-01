@@ -38,55 +38,61 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label htmlFor="url" className="mb-1 block text-sm text-zinc-400">
-          Target URL
+        <label htmlFor="url" className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          Target Environment URL
         </label>
-        <input
-          id="url"
-          type="url"
-          required
-          placeholder="https://target.com"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-        />
+        <div className="relative group">
+          <input
+            id="url"
+            type="url"
+            required
+            placeholder="https://example-environment.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="w-full rounded-xl border border-white/5 bg-zinc-800/20 px-4 py-3 text-xs text-zinc-100 placeholder-zinc-700 outline-none transition-all focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 hover:border-white/10"
+          />
+        </div>
       </div>
 
       {/* ── Scan mode toggle ── */}
-      <div>
-        <p className="mb-2 text-sm text-zinc-400">Scan mode</p>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-3">
+        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Audit Protocol</p>
+        <div className="grid grid-cols-1 gap-2">
           <button
             type="button"
             onClick={() => setSinglePage(true)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+            className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
               singlePage
-                ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
-                : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-500"
+                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                : "border-white/5 bg-transparent text-zinc-500 hover:border-white/10 hover:bg-white/[0.02]"
             }`}
           >
-            <FileSearch size={15} className="shrink-0" />
-            <span>
-              <span className="block font-medium">Single page</span>
-              <span className="text-xs opacity-70">Fast · exact URL only</span>
-            </span>
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-all ${singlePage ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" : "bg-zinc-800/50 text-zinc-600 ring-white/5"}`}>
+              <FileSearch size={16} />
+            </div>
+            <div>
+              <span className={`block text-xs font-black tracking-tight ${singlePage ? "text-zinc-100" : "text-zinc-400"}`}>Point Scan</span>
+              <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Target URL Only</span>
+            </div>
           </button>
           <button
             type="button"
             onClick={() => setSinglePage(false)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+            className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
               !singlePage
-                ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
-                : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-500"
+                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                : "border-white/5 bg-transparent text-zinc-500 hover:border-white/10 hover:bg-white/[0.02]"
             }`}
           >
-            <Layers size={15} className="shrink-0" />
-            <span>
-              <span className="block font-medium">Full crawl</span>
-              <span className="text-xs opacity-70">Thorough · follows links</span>
-            </span>
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-all ${!singlePage ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" : "bg-zinc-800/50 text-zinc-600 ring-white/5"}`}>
+              <Layers size={16} />
+            </div>
+            <div>
+              <span className={`block text-xs font-black tracking-tight ${!singlePage ? "text-zinc-100" : "text-zinc-400"}`}>Recursive Crawl</span>
+              <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Deep Network Probe</span>
+            </div>
           </button>
         </div>
       </div>
@@ -94,9 +100,9 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
       <div>
         <label
           htmlFor="maxPayloads"
-          className="mb-1 block text-sm text-zinc-400"
+          className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500"
         >
-          Max payloads / param
+          Payload Density
         </label>
         <input
           id="maxPayloads"
@@ -105,21 +111,23 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
           max={200}
           value={maxPayloads}
           onChange={(e) => setMaxPayloads(Number(e.target.value))}
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+          className="w-full rounded-xl border border-white/5 bg-zinc-800/20 px-4 py-3 text-xs text-zinc-100 outline-none transition-all focus:border-emerald-500/30 hover:border-white/10"
         />
       </div>
 
       {error && (
-        <p className="text-sm text-red-400">{error}</p>
+        <p className="rounded-lg bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 ring-1 ring-red-500/20 italic">
+          {error}
+        </p>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+        className="relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-emerald-600 px-5 py-4 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-emerald-500 hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] disabled:opacity-50 active:scale-[0.98]"
       >
-        <Crosshair size={16} />
-        {loading ? "Starting Scan..." : "Start Scan"}
+        <Crosshair size={16} className={loading ? "animate-spin" : ""} />
+        {loading ? "Engaging..." : "Initialize Audit"}
       </button>
     </form>
   );
