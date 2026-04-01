@@ -37,6 +37,10 @@ def collect_training_sample(
     reflection_position: str,
     url: str,
     allowed_chars: list[str] | None = None,
+    response_snippet: str | None = None,
+    sink_name: str | None = None,
+    dataflow: str | None = None,
+    source_name: str | None = None,
 ) -> None:
     """
     Collect a single training sample from fuzzer execution result.
@@ -55,6 +59,10 @@ def collect_training_sample(
         reflection_position: where in HTML (e.g., 'attribute', 'script')
         url: target URL
         allowed_chars: allowed special characters (optional)
+        response_snippet: context around payload in response (optional)
+        sink_name: vulnerable sink name for DOM XSS (optional)
+        dataflow: description of data flow path (optional)
+        source_name: tainted source name (optional)
     """
     sample = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -66,6 +74,11 @@ def collect_training_sample(
         "technique": technique,
         "severity": severity,
         "allowed_chars": allowed_chars,
+        # context enrichment fields
+        "response_snippet": response_snippet,  # where in response payload appeared
+        "sink_name": sink_name,                 # vulnerable function/property
+        "source_name": source_name,             # tainted input source
+        "dataflow": dataflow,                   # source -> sink path
         # labels
         "executed": executed,
         "dialog_triggered": dialog_triggered,
@@ -138,6 +151,12 @@ def collect_batch_training_samples(
         exact_match = evidence.get("exact_match", False)
         reflection_position = evidence.get("reflection_position", "none")
         
+        # extract context-enriching fields from evidence
+        response_snippet = evidence.get("context_snippet")
+        sink_name = evidence.get("sink")
+        dataflow = evidence.get("dataflow")
+        source_name = evidence.get("source")
+        
         # only collect samples with meaningful results (reflected or executed)
         if reflected or executed:
             collect_training_sample(
@@ -154,6 +173,10 @@ def collect_batch_training_samples(
                 reflection_position=reflection_position,
                 url=url,
                 allowed_chars=allowed_chars,
+                response_snippet=response_snippet,
+                sink_name=sink_name,
+                dataflow=dataflow,
+                source_name=source_name,
             )
             collected += 1
     

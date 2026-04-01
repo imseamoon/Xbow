@@ -100,20 +100,46 @@ DOM_SINKS = {
 
 # tainted sources — user-controlled input that flows into sinks
 TAINTED_SOURCES = [
+    # Location object - all properties are user-controlled via URL
     r"document\.URL",
     r"document\.documentURI",
     r"document\.referrer",
     r"document\.cookie",
-    r"location\.(hash|search|href|pathname)",
+    r"location\.(hash|search|href|pathname|hostname|port|protocol|origin|host)",
+    r"window\.location\.(hash|search|href|pathname|hostname|port|protocol|origin|host)",
     r"window\.name",
-    r"window\.location\.(hash|search|href)",
+    r"window\.location",           # catch all location.* properties
+    
+    # URLSearchParams and query parsing
     r"URLSearchParams",
-    r"\.getParameter\s*\(",
+    r"new\s+URL\s*\(",             # new URL(href) - browser API
+    r"\.getParameter\s*\(",        # custom getParameter methods
+    r"\.get\s*\(",                 # generic .get() calls (dict-like)
+    
+    # Storage APIs
     r"localStorage\.",
     r"sessionStorage\.",
+    r"localStorage\.getItem\s*\(",
+    r"sessionStorage\.getItem\s*\(",
+    
+    # Message/Communication APIs
     r"postMessage",
-    r"\be\.data\b",           # message event data (postMessage receiver)
-    r"\bevent\.data\b",       # message event data (named 'event')
+    r"\be\.data\b",                # message event data (postMessage receiver)
+    r"\bevent\.data\b",            # message event data (named 'event')
+    r"\.origin\b",                 # message event origin property
+    r"\.lastEventId\b",            # EventSource data
+    
+    # Form input data
+    r"FormData",
+    r"\.value\b",                  # input.value
+    r"\.textContent\b",            # user-editable elements
+    r"\.innerHTML\b",              # rarely a source but can be in some contexts
+    
+    # Other global objects that can be tampered with
+    r"document\.domain",
+    r"document\.title",
+    r"window\.frameElement",
+    r"navigator\.userAgent",       # sometimes in dangerous contexts
 ]
 
 TAINTED_PATTERN = re.compile("|".join(TAINTED_SOURCES), re.IGNORECASE)
@@ -280,11 +306,20 @@ def _build_taint_set(lines: list[str]) -> tuple[set[str], str]:
     """
     multi-hop taint propagation across all lines of a script.
     starts from known tainted sources and propagates through assignments.
+    handles:
+    - direct variable assignments: var x = location.hash
+    - method calls: var x = params.get(...) 
+    - object property access: var x = obj.prop
+    - bracket notation: var x = dict[key]
 
     returns (set of tainted variable names, original source name)
     """
     tainted: set[str] = set()
     original_source = ""
+    
+    # Also track tainted objects (e.g., 'urlParams' after URLSearchParams assignment)
+    # so we can detect method calls on them like urlParams.get()
+    tainted_objects: dict[str, str] = {}  # var_name -> source_name
 
     # pass 1: seed taint from lines that directly contain a tainted source
     for i, line in enumerate(lines):
@@ -300,18 +335,21 @@ def _build_taint_set(lines: list[str]) -> tuple[set[str], str]:
         var = _extract_var_from_line(line)
         if var:
             tainted.add(var)
+            tainted_objects[var] = src.group(0)
 
-    # pass 2: propagate taint through variable assignments (up to 3 hops)
-    # e.g. params = URLSearchParams → name = params.get() → ...
-    for _ in range(3):
+    # pass 2: propagate taint through variable assignments (up to 4 hops for better coverage)
+    # e.g. params = URLSearchParams → name = params.get() → elem = name → ...
+    for hop in range(4):
         new_tainted: set[str] = set()
+        new_objects: dict[str, str] = {}
+        
         for i, line in enumerate(lines):
             if _is_comment_line(line):
                 continue
             var = _extract_var_from_line(line)
             if not var or var in tainted:
                 continue
-            # check if any already-tainted variable is used on the RHS
+            
             # get the RHS (everything after the first =)
             eq_pos = line.find("=")
             if eq_pos < 0:
@@ -320,15 +358,35 @@ def _build_taint_set(lines: list[str]) -> tuple[set[str], str]:
             # skip if it's == or ===
             if rhs.startswith("="):
                 continue
+            
             cleaned_rhs = re.sub(r"""(['"`])(?:(?!\1).)*\1""", '""', rhs)
+            
+            # check 1: does any tainted variable appear in the RHS?
             for tv in tainted:
                 pat = re.compile(r"\b" + re.escape(tv) + r"\b")
                 if pat.search(cleaned_rhs):
                     new_tainted.add(var)
+                    new_objects[var] = original_source or tainted_objects.get(tv, "tainted_var")
                     break
+            
+            # check 2: is a tainted object's method/property being called?
+            # e.g., var name = params.get(...) where 'params' is tainted
+            for tobj_name, tobj_source in tainted_objects.items():
+                # matches: obj.method(...), obj.prop, obj['key'], etc.
+                obj_patterns = [
+                    r"\b" + re.escape(tobj_name) + r"\s*\.\s*\w+",  # obj.method or obj.prop
+                    r"\b" + re.escape(tobj_name) + r"\s*\[",          # obj[key]
+                ]
+                for pat_str in obj_patterns:
+                    if re.search(pat_str, cleaned_rhs):
+                        new_tainted.add(var)
+                        new_objects[var] = tobj_source
+                        break
+        
         if not new_tainted:
             break
         tainted |= new_tainted
+        tainted_objects.update(new_objects)
 
     return tainted, original_source
 
@@ -470,8 +528,11 @@ def findings_to_results(
         if not f.has_tainted_source:
             continue  # only report sinks with confirmed tainted sources
 
+        # Create a more descriptive payload field showing the data flow
+        dataflow_desc = f"{f.source_name} → {f.sink_name}"
+        
         results.append({
-            "payload": f"DOM-XSS: {f.sink_name} <- {f.source_name}",
+            "payload": f"DOM-XSS: {dataflow_desc}",
             "target_param": f.source_name,
             "reflected": False,
             "executed": False,
@@ -482,12 +543,15 @@ def findings_to_results(
                 "reflection_position": "script",
                 "browser_alert_triggered": False,
                 "sink": f.sink_name,
+                "sink_type": f.sink_type,
                 "source": f.source_name,
+                "source_is_tainted": True,
                 "line": f.line_number,
                 "snippet": f.line_content,
                 "severity": f.severity,
                 "confidence": f.confidence,
                 "script_url": f.script_url,
+                "dataflow": dataflow_desc,  # explicit data flow description
             },
         })
 

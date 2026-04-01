@@ -6,6 +6,7 @@ fastapi service that sends, checks reflection, verifies in browser, scans dom
 import asyncio
 import logging
 import os
+import re
 
 from fastapi import FastAPI, HTTPException
 
@@ -72,6 +73,61 @@ def detect_advanced_xss_type(payload: str, position: str, response_body: str, is
     
     # Default: treat as reflected XSS
     return "reflected_xss"
+
+
+def _deduplicate_similar_vulns(results: list[FuzzResult]) -> list[FuzzResult]:
+    """
+    deduplicate similar/near-identical vulnerabilities to reduce noise.
+    keeps the result with highest confidence/severity.
+    """
+    if not results:
+        return results
+    
+    seen_vulns: dict[str, FuzzResult] = {}
+    
+    for result in results:
+        if not result.vuln:
+            # non-vulns don't need dedup
+            continue
+        
+        # create a signature based on type, position, and payload similarity
+        # exact payload match or same sink with similar payloads
+        sig_parts = [
+            result.type,  # reflected_xss, stored_xss, dom_xss, etc.
+            result.evidence.get("reflection_position", "unknown"),
+            result.evidence.get("sink", ""),  # for DOM XSS
+        ]
+        sig = "|".join(str(p) for p in sig_parts)
+        
+        # for the payload, use a simplified version (remove quotes, whitespace variations)
+        payload_simplified = re.sub(r'[\s\'""`]', '', result.payload[:50].lower())
+        
+        # combine into final signature
+        final_sig = f"{sig}:{payload_simplified}"
+        
+        if final_sig not in seen_vulns:
+            seen_vulns[final_sig] = result
+        else:
+            # keep the result with higher severity/confidence
+            existing = seen_vulns[final_sig]
+            severity_rank = {"low": 0, "medium": 1, "high": 2}
+            
+            existing_severity = severity_rank.get(
+                existing.evidence.get("severity", "medium"), 1
+            )
+            new_severity = severity_rank.get(
+                result.evidence.get("severity", "medium"), 1
+            )
+            
+            if new_severity > existing_severity or (
+                new_severity == existing_severity and result.executed
+            ):
+                seen_vulns[final_sig] = result
+    
+    # Reconstruct results maintaining original order for non-vulns, then deduped vulns
+    final = [r for r in results if not r.vuln]
+    final.extend(seen_vulns.values())
+    return final
 
 
 app = FastAPI(
@@ -291,6 +347,9 @@ async def test(request: FuzzRequest):
             f"{vuln_count} vulnerabilities confirmed"
         )
         
+        # deduplicate similar vulnerabilities
+        final_results = _deduplicate_similar_vulns(final_results)
+        
         # collect training samples for ranker model
         try:
             result_dicts = [r.model_dump() for r in final_results]
@@ -487,6 +546,9 @@ async def test(request: FuzzRequest):
         f"fuzz complete: {len(final_results)} results, "
         f"{vuln_count} vulnerabilities confirmed"
     )
+    
+    # deduplicate similar vulnerabilities to reduce noise
+    final_results = _deduplicate_similar_vulns(final_results)
     
     # collect training samples for ranker model
     try:

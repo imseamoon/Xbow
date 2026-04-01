@@ -9,7 +9,7 @@ from pathlib import Path
 
 # ─── Paths (matching actual tree structure) ──────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent   # red-sentinel/
-DATASET_DIR = PROJECT_ROOT / "dataset" / "splits"
+DATASET_DIR = PROJECT_ROOT / "dataset" / "processed" / "splits_from_ranker"
 MODEL_DIR = PROJECT_ROOT / "model"
 CUSTOM_TOKENIZER_PATH = MODEL_DIR / "tokenizer" / "tokenizer.json"
 CHECKPOINT_DIR = MODEL_DIR / "checkpoints"
@@ -19,6 +19,7 @@ CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 (CHECKPOINT_DIR / "logs").mkdir(parents=True, exist_ok=True)
 
 # ─── Dataset Splits (CSV files) ─────────────────────────
+# Using enriched training data from prepare_enriched_training_data.py
 TRAIN_FILE = DATASET_DIR / "train.csv"
 VAL_FILE = DATASET_DIR / "val.csv"
 TEST_FILE = DATASET_DIR / "test.csv"
