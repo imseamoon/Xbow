@@ -156,6 +156,11 @@ async def _verify_one(
         dialog_info: dict = {"triggered": False, "message": ""}
         console_errors: list[str] = []
         nav_error: str | None = None
+        execution_flags: dict = {
+            "alert_called": False,
+            "script_executed": False,
+            "injection_detected": False
+        }
 
         try:
             # listen for dialogs (alert, confirm, prompt)
@@ -172,6 +177,22 @@ async def _verify_one(
                 if msg.type == "error" else None
             ))
 
+            # inject execution tracking before payload
+            try:
+                await page.add_init_script("""
+                    window._xss_verification = {
+                        alert_called: false,
+                        script_executed: false,
+                        original_alert: window.alert
+                    };
+                    window.alert = function(msg) {
+                        window._xss_verification.alert_called = true;
+                        return window._xss_verification.original_alert.call(window, msg);
+                    };
+                    window._xss_verification.script_executed = true;
+                """)
+            except Exception as e:
+                logger.debug(f"init script injection failed: {e}")
             # build the injected url
             injected_url = _inject_param(base_url, param, payload)
 
@@ -196,11 +217,25 @@ async def _verify_one(
             # brief wait for any delayed js execution
             await page.wait_for_timeout(300)
 
+            # check execution flags
+            try:
+                exec_flags = await page.evaluate("window._xss_verification || {}")
+                execution_flags.update(exec_flags)
+            except Exception:
+                pass
             # check for dom mutations that indicate script injection
             dom_mutations = await _count_injected_elements(page, payload)
 
             elapsed = (time.monotonic() - start) * 1000
-            executed = dialog_info["triggered"] or dom_mutations > 0
+            # execution confirmed if:
+            # 1. Dialog popped up (strongest signal)
+            # 2. Alert function was actually called (bypass detection)
+            # 3. Injected elements exist AND payload suggests execution
+            executed = (
+                dialog_info["triggered"] or 
+                execution_flags.get("alert_called", False) or
+                (dom_mutations > 0 and _payload_suggests_execution(payload))
+            )
 
             return VerifyResult(
                 payload=payload,
@@ -246,6 +281,41 @@ async def _count_injected_elements(page, payload: str) -> int:
     except Exception:
         return 0
 
+def _payload_suggests_execution(payload: str) -> bool:
+    """
+    check if the payload structure suggests it should have executed.
+    this distinguishes between "element exists" and "code executed"
+    """
+    payload_lower = payload.lower()
+    
+    # payloads with guaranteed-to-execute event handlers
+    executing_indicators = [
+        'alert(',      # direct function call
+        'prompt(',     # direct function call
+        'confirm(',    # direct function call
+        'console.log(', # safe execution marker
+        'eval(',       # definitely executes
+        'svg/onload',  # svg construction - onload fires on insert
+    ]
+    
+    for indicator in executing_indicators:
+        if indicator in payload_lower:
+            return True
+    
+    # payloads that might not execute (event handlers that require user action)
+    non_executing_patterns = [
+        'onclick',     # requires user click
+        'onmouseover', # requires mouse over
+        'onkeydown',   # requires key press
+        'onfocus',     # requires focus (not automatic)
+    ]
+    
+    for pattern in non_executing_patterns:
+        if pattern in payload_lower:
+            return False
+    
+    # default: assume safe indicators like onerror/onload are reliable
+    return True
 
 async def verify_stored_form_payloads(
     page_url: str,

@@ -39,7 +39,28 @@ AI_TO_CONTEXT = {
     "generic": "html_body",
 }
 
-MODEL_DIR = Path(os.getenv("MODEL_DIR", "/app/model"))
+
+def _resolve_model_dir() -> Path:
+    """resolve model dir for both docker (/app/model) and local repo runs."""
+    env_model_dir = os.getenv("MODEL_DIR")
+    if env_model_dir:
+        return Path(env_model_dir)
+
+    here = Path(__file__).resolve()
+    repo_root = here.parents[2]
+    candidates = [
+        Path("/app/model"),
+        repo_root / "model",
+    ]
+    for candidate in candidates:
+        if (candidate / "checkpoints" / "best.pt").exists():
+            return candidate
+
+    # fallback keeps previous behavior when checkpoint does not exist yet
+    return candidates[0]
+
+
+MODEL_DIR = _resolve_model_dir()
 CHECKPOINT_PATH = MODEL_DIR / "checkpoints" / "best.pt"
 MAX_LENGTH = 128
 
@@ -79,7 +100,10 @@ class AIClassifier:
             self.model.to(self.device)
             self.model.eval()
 
-            self.tokenizer = DistilBertTokenizerFast.from_pretrained("distilbert-base-uncased")
+            self.tokenizer = DistilBertTokenizerFast.from_pretrained(
+                "distilbert-base-uncased",
+                clean_up_tokenization_spaces=False,
+            )
 
             logger.info(f"ai classifier loaded from {CHECKPOINT_PATH} on {self.device}")
 

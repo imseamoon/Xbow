@@ -43,6 +43,7 @@ async def inject_probes(
     for form fields, falling back to GET).
     """
     results: dict[str, dict] = {}
+    post_globally_supported: bool | None = None
 
     async with httpx.AsyncClient(
         timeout=timeout,
@@ -70,34 +71,45 @@ async def inject_probes(
                 logger.warning(f"probe GET failed param={param}: {e}")
 
             # Also try POST (form body) — many form params only reflect via POST
-            try:
-                # Parse the base URL without the probe query string
-                parsed = urlparse(url)
-                base_url = urlunparse(parsed._replace(query=""))
-                post_data = {param: marker}
-                response = await client.post(
-                    base_url or url,
-                    data=post_data,
-                )
-                post_result = {
-                    "marker": marker,
-                    "status_code": response.status_code,
-                    "body": response.text,
-                    "headers": dict(response.headers),
-                }
-                logger.debug(f"probe POST param={param} marker={marker} status={response.status_code}")
-            except Exception as e:
-                logger.warning(f"probe POST failed param={param}: {e}")
+            if post_globally_supported is not False:
+                try:
+                    # Parse the base URL without the probe query string
+                    parsed = urlparse(url)
+                    base_url = urlunparse(parsed._replace(query=""))
+                    post_data = {param: marker}
+                    response = await client.post(
+                        base_url or url,
+                        data=post_data,
+                    )
+                    post_result = {
+                        "marker": marker,
+                        "status_code": response.status_code,
+                        "body": response.text,
+                        "headers": dict(response.headers),
+                    }
+                    logger.debug(f"probe POST param={param} marker={marker} status={response.status_code}")
+
+                    # Learn endpoint behavior once and avoid repeated 405/501/403 noise.
+                    if response.status_code in (405, 501, 403):
+                        post_globally_supported = False
+                    else:
+                        post_globally_supported = True
+                except Exception as e:
+                    logger.warning(f"probe POST failed param={param}: {e}")
 
             # Prefer whichever method reflected the marker.
             # POST is preferred for form fields; GET is the fallback.
             if post_result and marker in post_result.get("body", ""):
+                post_result["probe_method"] = "post"
                 results[param] = post_result
             elif get_result and marker in get_result.get("body", ""):
+                get_result["probe_method"] = "get"
                 results[param] = get_result
             elif get_result:
+                get_result["probe_method"] = "get"
                 results[param] = get_result
             elif post_result:
+                post_result["probe_method"] = "post"
                 results[param] = post_result
             else:
                 results[param] = {
@@ -105,6 +117,7 @@ async def inject_probes(
                     "status_code": 0,
                     "body": "",
                     "headers": {},
+                    "probe_method": "none",
                 }
 
     return results
