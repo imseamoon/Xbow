@@ -145,7 +145,7 @@ export default function ScanDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-zinc-500">
+      <div className="flex h-64 items-center justify-center text-slate-500">
         Loading...
       </div>
     );
@@ -153,9 +153,9 @@ export default function ScanDetailPage() {
 
   if (error || !scan) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-4 text-zinc-500">
+      <div className="flex h-64 flex-col items-center justify-center gap-4 text-slate-500">
         <p>{error || "Scan not found"}</p>
-        <Link href="/" className="text-sm text-emerald-400 hover:underline">
+        <Link href="/" className="text-sm text-pink-600 hover:underline">
           Back to dashboard
         </Link>
       </div>
@@ -181,26 +181,26 @@ export default function ScanDetailPage() {
       <div>
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft size={14} /> Dashboard
         </Link>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-100">
+            <h1 className="text-xl font-bold text-slate-900">
               Scan Detail
             </h1>
-            <p className="mt-1 font-mono text-sm text-zinc-400">{scan.url}</p>
-            <p className="mt-0.5 text-xs text-zinc-600">ID: {scan.id}</p>
+            <p className="mt-1 font-mono text-sm text-slate-500">{scan.url}</p>
+            <p className="mt-0.5 text-xs text-slate-400">ID: {scan.id}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-xs">
               <Wifi
                 size={12}
-                className={connected ? "text-emerald-400" : "text-red-400"}
+                className={connected ? "text-emerald-600" : "text-red-600"}
               />
               <span
-                className={connected ? "text-emerald-400" : "text-red-400"}
+                className={connected ? "text-emerald-600" : "text-red-600"}
               >
                 {connected ? "Live" : "Offline"}
               </span>
@@ -209,7 +209,7 @@ export default function ScanDetailPage() {
             {isActive && (
               <button
                 onClick={handleCancel}
-                className="flex items-center gap-1 rounded-lg border border-red-800 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-900/30"
+                className="flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50"
               >
                 <XCircle size={12} /> Cancel
               </button>
@@ -221,9 +221,9 @@ export default function ScanDetailPage() {
       {/* ── progress ────────────────────────────────── */}
       {isActive && (
         <Card>
-          <ProgressBar value={scan.progress} label={scan.phase ?? "Pending"} />
+          <ProgressBar value={scan.progress} label={scan.phase ?? "Pending"} active />
           {message && (
-            <p className="mt-2 text-xs text-zinc-400">{message}</p>
+            <p className="mt-2 text-xs text-slate-500">{message}</p>
           )}
         </Card>
       )}
@@ -251,7 +251,7 @@ export default function ScanDetailPage() {
       {scan.status === ScanStatus.DONE && (
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-100">Reports</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Reports</h2>
 
             {/* Regenerate button — amber when something is broken/missing, muted otherwise */}
             {(() => {
@@ -267,8 +267,8 @@ export default function ScanDetailPage() {
                   disabled={regenerating}
                   className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     hasBroken
-                      ? "border-amber-700 text-amber-400 hover:bg-amber-900/30"
-                      : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                      ? "border-amber-200 text-amber-600 hover:bg-amber-50"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-900"
                   }`}
                 >
                   <RefreshCw size={12} className={regenerating ? "animate-spin" : ""} />
@@ -280,10 +280,10 @@ export default function ScanDetailPage() {
 
           {/* Feedback banner */}
           {regenMsg && (
-            <p className={`mb-3 rounded-md px-3 py-2 text-xs ${
+            <p className={`mb-3 rounded-md px-3 py-2 text-xs border ${
               regenMsg.ok
-                ? "bg-emerald-900/30 text-emerald-400"
-                : "bg-red-900/30 text-red-400"
+                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                : "bg-red-50 text-red-600 border-red-100"
             }`}>
               {regenMsg.text}
             </p>
@@ -296,7 +296,7 @@ export default function ScanDetailPage() {
                 return isBroken ? (
                   <div
                     key={fmt}
-                    className="flex items-center gap-2 rounded-lg border border-red-800/60 px-4 py-2 text-sm text-red-500"
+                    className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600"
                     title="This report file is empty or corrupt — click Regenerate Reports"
                   >
                     <AlertTriangle size={14} />
@@ -308,7 +308,7 @@ export default function ScanDetailPage() {
                     href={getReportDownloadUrl(scanId, fmt)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:border-pink-300 hover:text-pink-600 hover:bg-pink-50"
                   >
                     <Download size={14} />
                     {fmt.toUpperCase()}
@@ -318,8 +318,8 @@ export default function ScanDetailPage() {
             </div>
           ) : (
             !regenerating && (
-              <p className="text-sm text-zinc-500">
-                No reports found. Click <span className="text-amber-400">Regenerate Reports</span> to create them from the saved scan data.
+              <p className="text-sm text-slate-500">
+                No reports found. Click <span className="text-amber-600 font-medium">Regenerate Reports</span> to create them from the saved scan data.
               </p>
             )
           )}
@@ -328,7 +328,7 @@ export default function ScanDetailPage() {
 
       {/* ── vulns ───────────────────────────────────── */}
       <Card>
-        <h2 className="mb-3 text-lg font-semibold text-zinc-100">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">
           Findings ({vulns.length})
         </h2>
         <VulnList vulns={vulns} />
@@ -336,14 +336,14 @@ export default function ScanDetailPage() {
 
       {/* ── scan config ─────────────────────────────── */}
       <Card>
-        <h2 className="mb-3 text-lg font-semibold text-zinc-100">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">
           Configuration
         </h2>
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           {Object.entries(scan.options).map(([key, val]) => (
             <div key={key}>
-              <p className="text-xs text-zinc-500">{key}</p>
-              <p className="font-mono text-zinc-300">
+              <p className="text-xs text-slate-500">{key}</p>
+              <p className="font-mono text-slate-700">
                 {Array.isArray(val) ? val.join(", ") : String(val)}
               </p>
             </div>

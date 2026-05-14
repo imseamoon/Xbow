@@ -21,11 +21,11 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
   if (scans.length === 0) {
     return (
       <div className="py-24 flex flex-col items-center justify-center text-slate-500">
-        <div className="size-16 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
-          <div className="size-8 rounded-full bg-slate-800 animate-pulse" />
+        <div className="size-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-200">
+          <div className="size-8 rounded-full bg-slate-100 animate-pulse" />
         </div>
-        <p className="text-sm font-medium text-slate-400">System Idle</p>
-        <p className="text-xs text-slate-500 mt-1">Initialize an audit to begin monitoring</p>
+        <p className="text-sm font-medium text-slate-600">System Idle</p>
+        <p className="text-xs text-slate-400 mt-1">Initialize an audit to begin monitoring</p>
       </div>
     );
   }
@@ -34,7 +34,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
     <div className="overflow-x-auto w-full">
       <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
         <thead>
-          <tr className="border-b border-white/5 bg-[#111113] text-xs font-medium text-slate-500">
+          <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500">
             <th className="px-6 py-4">Target</th>
             <th className="px-6 py-4 text-center">Status</th>
             <th className="px-6 py-4">Progress</th>
@@ -43,24 +43,24 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
             <th className="px-6 py-4" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/5 relative bg-[#0A0A0B]">
+        <tbody className="divide-y divide-slate-100 relative bg-white">
           <AnimatePresence initial={false}>
             {scans.map((scan) => (
               <motion.tr
                 layout
                 initial={{ opacity: 0, y: -10, backgroundColor: "rgba(236, 72, 153, 0.05)" }}
-                animate={{ opacity: 1, y: 0, backgroundColor: "rgba(0, 0, 0, 0)" }}
+                animate={{ opacity: 1, y: 0, backgroundColor: "rgba(255, 255, 255, 1)" }}
                 exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
                 transition={{ duration: 0.3 }}
                 key={scan.id}
-                className="group hover:bg-white/[0.02] transition-colors"
+                className="group hover:bg-slate-50 transition-colors"
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-md bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-pink-500 uppercase">{new URL(scan.url).hostname.substring(0,2)}</span>
+                    <div className="size-8 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-bold text-pink-600 uppercase">{new URL(scan.url).hostname.substring(0,2)}</span>
                     </div>
-                    <span className="font-mono text-sm text-slate-300 truncate max-w-[200px] lg:max-w-[300px]">
+                    <span className="font-mono text-sm text-slate-700 truncate max-w-[200px] lg:max-w-[300px]">
                       {scan.url}
                     </span>
                   </div>
@@ -80,9 +80,9 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                           <span className="size-1.5 rounded-full bg-pink-500 animate-pulse" />
                           {scan.phase || "Probing"}
                         </span>
-                        <span className="text-pink-500">{Math.round(scan.progress)}%</span>
+                        <span className="text-pink-600">{Math.round(scan.progress)}%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${scan.progress}%` }}
@@ -92,11 +92,11 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                       </div>
                     </div>
                   ) : (
-                    <span className={`text-xs font-medium flex items-center gap-2 ${scan.status === ScanStatus.DONE ? "text-emerald-500" : "text-slate-500"}`}>
+                    <span className={`text-xs font-medium flex items-center gap-2 ${scan.status === ScanStatus.DONE ? "text-emerald-600" : "text-slate-500"}`}>
                       {scan.status === ScanStatus.DONE ? (
                         <><span className="size-1.5 rounded-full bg-emerald-500" /> Complete</>
                       ) : (
-                        <><span className="size-1.5 rounded-full bg-slate-600" /> Terminated</>
+                        <><span className="size-1.5 rounded-full bg-slate-400" /> Terminated</>
                       )}
                     </span>
                   )}
@@ -108,8 +108,8 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                     animate={{ scale: 1 }}
                     className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                       (scan.vulns?.length ?? 0) > 0 
-                        ? "bg-red-500/10 text-red-500" 
-                        : "bg-slate-900 text-slate-500"
+                        ? "bg-red-50 text-red-600" 
+                        : "bg-slate-100 text-slate-500"
                     }`}
                   >
                     {scan.vulns?.length ?? 0}
@@ -124,7 +124,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Link
                       href={`/scan/${scan.id}`}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-pink-400 hover:bg-pink-500/10 transition-colors"
+                      className="p-1.5 rounded-md text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors"
                     >
                       <ExternalLink size={16} />
                     </Link>
@@ -136,7 +136,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                           onDelete?.(scan.id);
                         } catch { /* ignore */ }
                       }}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>

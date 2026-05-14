@@ -13,7 +13,7 @@ const isDomXss = (v: Vuln) =>
 export function VulnList({ vulns }: { vulns: Vuln[] }) {
   if (vulns.length === 0) {
     return (
-      <div className="py-8 text-center text-zinc-500">
+      <div className="py-8 text-center text-slate-500">
         No vulnerabilities found.
       </div>
     );
@@ -27,99 +27,99 @@ export function VulnList({ vulns }: { vulns: Vuln[] }) {
         return (
           <div
             key={v.id ?? i}
-            className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
+            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
           >
             {/* ── header row ── */}
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <SeverityBadge severity={v.severity} />
-              <span className="text-sm font-medium text-zinc-200">
+              <span className="text-sm font-medium text-slate-800">
                 {v.type.replace(/_/g, " ")}
               </span>
-              <span className="ml-auto text-xs text-zinc-500">
+              <span className="ml-auto text-xs text-slate-500">
                 {domXss ? "source" : "param"}:{" "}
-                <code className="text-zinc-300">{v.param}</code>
+                <code className="text-slate-600">{v.param}</code>
               </span>
             </div>
 
             {/* ── page URL ── */}
-            <div className="mb-2 truncate text-xs text-zinc-500">
-              <span className="mr-1 text-zinc-600">page:</span>
+            <div className="mb-2 truncate text-xs text-slate-500">
+              <span className="mr-1 text-slate-400">page:</span>
               <a
                 href={v.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sky-400 hover:underline"
+                className="text-blue-600 hover:underline"
               >
                 {v.url}
               </a>
             </div>
 
             {/* ── payload / finding ── */}
-            <div className="mb-2 overflow-x-auto rounded bg-zinc-950 p-2">
-              <code className="whitespace-pre text-xs text-amber-400">
+            <div className="mb-2 overflow-x-auto rounded bg-slate-50 border border-slate-100 p-2">
+              <code className="whitespace-pre text-xs text-slate-800 font-medium">
                 {v.payload}
               </code>
             </div>
 
             {/* ── DOM XSS details ── */}
             {domXss && (ev.sink || ev.snippet) && (
-              <div className="mb-2 space-y-1 rounded bg-zinc-950/60 p-2 text-xs">
+              <div className="mb-2 space-y-1 rounded bg-slate-50 border border-slate-100 p-2 text-xs">
                 {ev.sink && (
                   <div>
-                    <span className="text-zinc-500">sink: </span>
-                    <code className="text-rose-400">{ev.sink}</code>
+                    <span className="text-slate-500">sink: </span>
+                    <code className="text-red-600">{ev.sink}</code>
                     {ev.line && (
-                      <span className="ml-2 text-zinc-600">line {ev.line}</span>
+                      <span className="ml-2 text-slate-400">line {ev.line}</span>
                     )}
                   </div>
                 )}
                 {ev.source && (
                   <div>
-                    <span className="text-zinc-500">source: </span>
-                    <code className="text-orange-400">{ev.source}</code>
+                    <span className="text-slate-500">source: </span>
+                    <code className="text-orange-600">{ev.source}</code>
                   </div>
                 )}
                 {ev.snippet && (
                   <div className="mt-1 overflow-x-auto">
-                    <span className="text-zinc-500">snippet: </span>
-                    <code className="text-zinc-400">{ev.snippet}</code>
+                    <span className="text-slate-500">snippet: </span>
+                    <code className="text-slate-600">{ev.snippet}</code>
                   </div>
                 )}
                 {ev.scriptUrl && ev.scriptUrl !== v.url && (
                   <div className="truncate">
-                    <span className="text-zinc-500">script: </span>
-                    <span className="text-zinc-400">{ev.scriptUrl}</span>
+                    <span className="text-slate-500">script: </span>
+                    <span className="text-slate-600">{ev.scriptUrl}</span>
                   </div>
                 )}
               </div>
             )}
 
             {/* ── flags row ── */}
-            <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
+            <div className="flex flex-wrap gap-4 text-xs text-slate-500">
               <span>
                 Reflected:{" "}
-                <span className={v.reflected ? "text-emerald-400" : "text-zinc-500"}>
+                <span className={v.reflected ? "text-emerald-600" : "text-slate-400"}>
                   {v.reflected ? "yes" : "no"}
                 </span>
               </span>
               <span>
                 Executed:{" "}
-                <span className={v.executed ? "text-red-400" : "text-zinc-500"}>
+                <span className={v.executed ? "text-red-600" : "text-slate-400"}>
                   {v.executed ? "yes" : "no"}
                 </span>
               </span>
               {!domXss && (
                 <span>
                   Position:{" "}
-                  <span className="text-zinc-300">{ev.reflectionPosition}</span>
+                  <span className="text-slate-600">{ev.reflectionPosition}</span>
                 </span>
               )}
               <span>
                 HTTP{" "}
-                <span className="text-zinc-300">{ev.responseCode}</span>
+                <span className="text-slate-600">{ev.responseCode}</span>
               </span>
               {ev.browserAlertTriggered && (
-                <span className="text-red-400">⚡ alert triggered</span>
+                <span className="text-red-600 font-medium">⚡ alert triggered</span>
               )}
             </div>
           </div>

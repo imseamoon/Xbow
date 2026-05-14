@@ -107,7 +107,7 @@ export default function DashboardPage() {
           <div className="relative size-8 flex items-center justify-center">
             <div className="absolute inset-0 border-2 border-pink-500 rounded-full animate-spin border-t-transparent" />
           </div>
-          <span className="text-sm font-medium text-slate-400">
+          <span className="text-sm font-medium text-slate-500">
             Loading data...
           </span>
         </motion.div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
       {/* ── Page Header ───────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
             <LayoutGrid size={24} className="text-pink-500" />
             Dashboard
           </h1>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
         
         <button
           onClick={() => setIsDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-md bg-pink-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-pink-500 active:bg-pink-700"
+          className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-pink-700 shadow-sm"
         >
           <Plus size={16} />
           New Scan
@@ -153,19 +153,19 @@ export default function DashboardPage() {
       {/* ── Operational Activity ───────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-slate-200">Recent Scans</h2>
+          <h2 className="text-lg font-medium text-slate-900">Recent Scans</h2>
           {scans.length > 0 && (
             <button
               onClick={handleClearAll}
               disabled={clearingAll}
-              className="text-sm text-slate-500 hover:text-red-400 transition-colors"
+              className="text-sm text-slate-500 hover:text-red-600 transition-colors"
             >
               {clearingAll ? "Clearing..." : "Clear All"}
             </button>
           )}
         </div>
         
-        <div className="rounded-xl bg-[#111113] border border-white/5 overflow-hidden">
+        <div className="rounded-xl bg-white border border-slate-200 overflow-hidden shadow-sm">
           <ScanTable scans={scans} onDelete={handleDeleteScan} />
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function DashboardPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#0A0A0B]/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm"
               onClick={() => setIsDrawerOpen(false)}
             />
             <motion.div 
@@ -186,18 +186,18 @@ export default function DashboardPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="relative z-[70] h-full w-full max-w-md bg-[#111113] border-l border-white/10 flex flex-col shadow-2xl"
+              className="relative z-[70] h-full w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-2xl"
             >
-              <div className="flex h-16 items-center justify-between border-b border-white/5 px-6">
-                <span className="text-sm font-semibold text-slate-200">Create New Scan</span>
+              <div className="flex h-16 items-center justify-between border-b border-slate-100 px-6">
+                <span className="text-sm font-semibold text-slate-900">Create New Scan</span>
                 <button 
                   onClick={() => setIsDrawerOpen(false)} 
-                  className="p-2 rounded-md hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                  className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <Plus size={20} className="rotate-45" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                 <NewScanForm onCreated={handleScanCreated} />
               </div>
             </motion.div>
@@ -210,22 +210,22 @@ export default function DashboardPage() {
 
 function MiniStat({ label, value, status, icon }: { label: string; value: string | number; status: string; icon?: React.ReactNode }) {
   const styles = {
-    active: { bg: "bg-pink-500/10", text: "text-pink-500", border: "border-white/5" },
-    secure: { bg: "bg-emerald-500/10", text: "text-emerald-500", border: "border-white/5" },
-    danger: { bg: "bg-red-500/10", text: "text-red-500", border: "border-white/5" },
+    active: { bg: "bg-pink-50", text: "text-pink-600", border: "border-slate-200" },
+    secure: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-slate-200" },
+    danger: { bg: "bg-red-50", text: "text-red-600", border: "border-slate-200" },
   };
 
   const style = styles[status as keyof typeof styles];
 
   return (
-    <div className={`rounded-xl bg-[#111113] border ${style.border} p-5`}>
+    <div className={`rounded-xl bg-white border ${style.border} p-5 shadow-sm`}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-slate-400">{label}</span>
+        <span className="text-sm font-medium text-slate-500">{label}</span>
         <div className={`p-2 rounded-md ${style.bg} ${style.text}`}>
           {icon}
         </div>
       </div>
-      <div className="text-3xl font-semibold text-slate-100">
+      <div className="text-3xl font-semibold text-slate-900">
         {value}
       </div>
     </div>

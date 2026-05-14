@@ -5,22 +5,22 @@ import { ScanStatus, VulnSeverity } from "@/lib/types";
 /* ── Status Badge ───────────────────────────────────────────── */
 
 const statusColors: Record<string, string> = {
-  [ScanStatus.PENDING]: "text-zinc-500 border-zinc-800 bg-zinc-900/10",
-  [ScanStatus.CRAWLING]: "text-blue-400 border-blue-500/20 bg-blue-500/5",
-  [ScanStatus.ANALYZING]: "text-violet-400 border-violet-500/20 bg-violet-500/5",
-  [ScanStatus.GENERATING]: "text-amber-400 border-amber-500/20 bg-amber-500/5",
-  [ScanStatus.FUZZING]: "text-orange-400 border-orange-500/20 bg-orange-500/5",
-  [ScanStatus.REPORTING]: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5",
-  [ScanStatus.DONE]: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5",
-  [ScanStatus.FAILED]: "text-red-400 border-red-500/20 bg-red-500/5",
-  [ScanStatus.CANCELLED]: "text-zinc-600 border-zinc-900 bg-transparent",
+  [ScanStatus.PENDING]: "text-slate-500 border-slate-200 bg-slate-50",
+  [ScanStatus.CRAWLING]: "text-pink-600 border-pink-200 bg-pink-50",
+  [ScanStatus.ANALYZING]: "text-violet-600 border-violet-200 bg-violet-50",
+  [ScanStatus.GENERATING]: "text-amber-600 border-amber-200 bg-amber-50",
+  [ScanStatus.FUZZING]: "text-orange-600 border-orange-200 bg-orange-50",
+  [ScanStatus.REPORTING]: "text-cyan-600 border-cyan-200 bg-cyan-50",
+  [ScanStatus.DONE]: "text-emerald-600 border-emerald-200 bg-emerald-50",
+  [ScanStatus.FAILED]: "text-red-600 border-red-200 bg-red-50",
+  [ScanStatus.CANCELLED]: "text-slate-400 border-slate-200 bg-transparent",
 };
 
 export function StatusBadge({ status }: { status: ScanStatus }) {
   return (
     <span
       className={`inline-flex items-center rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-        statusColors[status] ?? "text-zinc-500 border-zinc-800"
+        statusColors[status] ?? "text-slate-500 border-slate-200 bg-slate-50"
       }`}
     >
       {status}
@@ -31,18 +31,18 @@ export function StatusBadge({ status }: { status: ScanStatus }) {
 /* ── Severity Badge ─────────────────────────────────────────── */
 
 const severityColors: Record<string, string> = {
-  [VulnSeverity.CRITICAL]: "bg-red-500/20 text-red-400 border-red-500/30",
-  [VulnSeverity.HIGH]: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  [VulnSeverity.MEDIUM]: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  [VulnSeverity.LOW]: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  [VulnSeverity.INFO]: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  [VulnSeverity.CRITICAL]: "bg-red-50 text-red-600 border-red-200",
+  [VulnSeverity.HIGH]: "bg-orange-50 text-orange-600 border-orange-200",
+  [VulnSeverity.MEDIUM]: "bg-amber-50 text-amber-600 border-amber-200",
+  [VulnSeverity.LOW]: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  [VulnSeverity.INFO]: "bg-blue-50 text-blue-600 border-blue-200",
 };
 
 export function SeverityBadge({ severity }: { severity: VulnSeverity }) {
   return (
     <span
       className={`inline-flex items-center rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-        severityColors[severity] ?? "text-zinc-500 border-zinc-800"
+        severityColors[severity] ?? "text-slate-500 border-slate-200 bg-slate-50"
       }`}
     >
       {severity}
@@ -65,15 +65,15 @@ export function ProgressBar({
   return (
     <div className="w-full">
       {label && (
-        <div className="mb-1 flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500">
+        <div className="mb-1 flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-500">
           <span>{label}</span>
           <span>{clamped}%</span>
         </div>
       )}
-      <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-900 border border-white/5">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200">
         <div
-          className={`h-full bg-emerald-500 transition-all duration-700 ease-out ${
-            active ? "animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" : ""
+          className={`h-full bg-pink-500 transition-all duration-700 ease-out ${
+            active ? "animate-pulse shadow-[0_0_8px_rgba(236,72,153,0.4)]" : ""
           }`}
           style={{ width: `${clamped}%` }}
         />
@@ -92,7 +92,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div className={`technical-border bg-zinc-950/20 p-6 ${className}`}>
+    <div className={`rounded-xl bg-white border border-slate-200 p-6 shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -110,18 +110,18 @@ export function StatCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="technical-border bg-zinc-900/20 p-5 group transition-all hover:bg-zinc-900/40">
+    <div className="rounded-xl bg-white border border-slate-200 p-5 shadow-sm group transition-all hover:bg-slate-50">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600 group-hover:text-zinc-400 transition-colors">
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-700 transition-colors">
           {label}
         </span>
         {icon && (
-          <div className="text-zinc-700 transition-colors group-hover:text-emerald-500">
+          <div className="text-slate-400 transition-colors group-hover:text-pink-500">
             {icon}
           </div>
         )}
       </div>
-      <div className="text-2xl font-black tracking-tight text-zinc-100 font-mono">
+      <div className="text-2xl font-black tracking-tight text-slate-900 font-mono">
         {value}
       </div>
     </div>
