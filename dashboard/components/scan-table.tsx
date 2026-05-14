@@ -3,9 +3,10 @@
 import Link from "next/link";
 import type { Scan } from "@/lib/types";
 import { ScanStatus } from "@/lib/types";
-import { StatusBadge, ProgressBar } from "@/components/ui";
+import { StatusBadge } from "@/components/ui";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { deleteScan } from "@/lib/api";
+import { motion, AnimatePresence } from "framer-motion";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-US", {
@@ -19,103 +20,131 @@ function formatDate(iso: string) {
 export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: string) => void }) {
   if (scans.length === 0) {
     return (
-      <div className="py-16 text-center text-zinc-500">
-        No scans yet. Start one above.
+      <div className="py-24 flex flex-col items-center justify-center text-slate-500">
+        <div className="size-16 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+          <div className="size-8 rounded-full bg-slate-800 animate-pulse" />
+        </div>
+        <p className="text-sm font-medium text-slate-400">System Idle</p>
+        <p className="text-xs text-slate-500 mt-1">Initialize an audit to begin monitoring</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden border border-white/5 bg-[#080808]">
-      <table className="w-full text-left text-sm border-collapse">
+    <div className="overflow-x-auto w-full">
+      <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
         <thead>
-          <tr className="border-b border-white/5 bg-white/[0.02] text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
-            <th className="px-6 py-3">Asset Path</th>
-            <th className="px-6 py-3 text-center">Protocol Status</th>
-            <th className="px-6 py-3">Audit Stream</th>
-            <th className="px-6 py-3 text-center">Threats</th>
-            <th className="px-6 py-3 text-right">Timestamp</th>
-            <th className="px-6 py-3" />
+          <tr className="border-b border-white/5 bg-[#111113] text-xs font-medium text-slate-500">
+            <th className="px-6 py-4">Target</th>
+            <th className="px-6 py-4 text-center">Status</th>
+            <th className="px-6 py-4">Progress</th>
+            <th className="px-6 py-4 text-center">Threats</th>
+            <th className="px-6 py-4 text-right">Timestamp</th>
+            <th className="px-6 py-4" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/5">
-          {scans.map((scan) => (
-            <tr
-              key={scan.id}
-              className="group transition-all duration-150 hover:bg-emerald-500/[0.02]"
-            >
-              <td className="px-6 py-4">
-                <span className="font-mono text-[11px] font-medium text-zinc-400 group-hover:text-emerald-400 transition-colors">
-                  {scan.url}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex justify-center">
-                  <StatusBadge status={scan.status} />
-                </div>
-              </td>
-              <td className="w-48 px-6 py-4">
-                {scan.status !== ScanStatus.DONE &&
-                scan.status !== ScanStatus.FAILED &&
-                scan.status !== ScanStatus.CANCELLED ? (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-600">
-                      <span>Probing...</span>
-                      <span>{Math.round(scan.progress)}%</span>
+        <tbody className="divide-y divide-white/5 relative bg-[#0A0A0B]">
+          <AnimatePresence initial={false}>
+            {scans.map((scan) => (
+              <motion.tr
+                layout
+                initial={{ opacity: 0, y: -10, backgroundColor: "rgba(59, 130, 246, 0.05)" }}
+                animate={{ opacity: 1, y: 0, backgroundColor: "rgba(0, 0, 0, 0)" }}
+                exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.3 }}
+                key={scan.id}
+                className="group hover:bg-white/[0.02] transition-colors"
+              >
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-md bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-bold text-blue-500 uppercase">{new URL(scan.url).hostname.substring(0,2)}</span>
                     </div>
-                    <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 transition-all duration-500 ease-out shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                        style={{ width: `${scan.progress}%` }}
-                      />
-                    </div>
+                    <span className="font-mono text-sm text-slate-300 truncate max-w-[200px] lg:max-w-[300px]">
+                      {scan.url}
+                    </span>
                   </div>
-                ) : (
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${scan.status === ScanStatus.DONE ? "text-emerald-500/60" : "text-zinc-700"}`}>
-                    {scan.status === ScanStatus.DONE ? "Audit Sealed" : "Terminated"}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-center">
+                    <StatusBadge status={scan.status} />
+                  </div>
+                </td>
+                <td className="w-64 px-6 py-4">
+                  {scan.status !== ScanStatus.DONE &&
+                  scan.status !== ScanStatus.FAILED &&
+                  scan.status !== ScanStatus.CANCELLED ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-medium text-slate-500">
+                        <span className="flex items-center gap-2">
+                          <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+                          {scan.phase || "Probing"}
+                        </span>
+                        <span className="text-blue-500">{Math.round(scan.progress)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${scan.progress}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                          className="h-full bg-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <span className={`text-xs font-medium flex items-center gap-2 ${scan.status === ScanStatus.DONE ? "text-emerald-500" : "text-slate-500"}`}>
+                      {scan.status === ScanStatus.DONE ? (
+                        <><span className="size-1.5 rounded-full bg-emerald-500" /> Complete</>
+                      ) : (
+                        <><span className="size-1.5 rounded-full bg-slate-600" /> Terminated</>
+                      )}
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <motion.span
+                    key={scan.vulns?.length ?? 0}
+                    initial={{ scale: 1.2 }}
+                    animate={{ scale: 1 }}
+                    className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      (scan.vulns?.length ?? 0) > 0 
+                        ? "bg-red-500/10 text-red-500" 
+                        : "bg-slate-900 text-slate-500"
+                    }`}
+                  >
+                    {scan.vulns?.length ?? 0}
+                  </motion.span>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <span className="font-mono text-xs text-slate-500">
+                    {formatDate(scan.createdAt).split(",")[1]}
                   </span>
-                )}
-              </td>
-              <td className="px-6 py-4 text-center">
-                <span
-                  className={`inline-flex items-center justify-center min-w-[20px] h-4 rounded text-[9px] font-black tracking-tighter ring-1 transition-all ${
-                    (scan.vulns?.length ?? 0) > 0 
-                      ? "bg-red-500/10 text-red-500 ring-red-500/30" 
-                      : "bg-zinc-900 text-zinc-600 ring-white/5"
-                  }`}
-                >
-                  {scan.vulns?.length ?? 0}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <span className="font-mono text-[10px] text-zinc-600">
-                  {formatDate(scan.createdAt).split(",")[1]}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <div className="flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Link
-                    href={`/scan/${scan.id}`}
-                    className="text-zinc-500 hover:text-emerald-400 transition-colors"
-                  >
-                    <ExternalLink size={14} />
-                  </Link>
-                  <button
-                    onClick={async () => {
-                      if (!confirm("Confirm data erasure?")) return;
-                      try {
-                        await deleteScan(scan.id);
-                        onDelete?.(scan.id);
-                      } catch { /* ignore */ }
-                    }}
-                    className="text-zinc-800 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link
+                      href={`/scan/${scan.id}`}
+                      className="p-1.5 rounded-md text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                    >
+                      <ExternalLink size={16} />
+                    </Link>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("Are you sure you want to delete this scan?")) return;
+                        try {
+                          await deleteScan(scan.id);
+                          onDelete?.(scan.id);
+                        } catch { /* ignore */ }
+                      }}
+                      className="p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </motion.tr>
+            ))}
+          </AnimatePresence>
         </tbody>
       </table>
     </div>

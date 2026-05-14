@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { createScan } from "@/lib/api";
 import type { Scan } from "@/lib/types";
-import { Crosshair, Layers, FileSearch } from "lucide-react";
+import { Crosshair, Layers, FileSearch, ShieldAlert } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface NewScanFormProps {
   onCreated: (scan: Scan) => void;
@@ -38,96 +39,106 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label htmlFor="url" className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
-          Target Environment URL
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <label htmlFor="url" className="flex items-center gap-2 text-sm font-medium text-slate-300">
+          Target URL
         </label>
         <div className="relative group">
           <input
             id="url"
             type="url"
             required
-            placeholder="https://example-environment.com"
+            placeholder="https://example.com"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="w-full rounded-xl border border-white/5 bg-zinc-800/20 px-4 py-3 text-xs text-zinc-100 placeholder-zinc-700 outline-none transition-all focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 hover:border-white/10"
+            className="w-full rounded-md border border-white/10 bg-[#0A0A0B] px-4 py-3 text-sm font-mono text-slate-100 placeholder-slate-600 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-white/20"
           />
         </div>
       </div>
 
       {/* ── Scan mode toggle ── */}
       <div className="space-y-3">
-        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Audit Protocol</p>
-        <div className="grid grid-cols-1 gap-2">
+        <p className="text-sm font-medium text-slate-300">Scan Strategy</p>
+        <div className="grid grid-cols-1 gap-3">
           <button
             type="button"
             onClick={() => setSinglePage(true)}
-            className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+            className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
               singlePage
-                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                : "border-white/5 bg-transparent text-zinc-500 hover:border-white/10 hover:bg-white/[0.02]"
+                ? "border-blue-500/50 bg-blue-500/10"
+                : "border-white/5 bg-[#0A0A0B] hover:border-white/10"
             }`}
           >
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-all ${singlePage ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" : "bg-zinc-800/50 text-zinc-600 ring-white/5"}`}>
-              <FileSearch size={16} />
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${singlePage ? "bg-blue-500/20 text-blue-400" : "bg-slate-900 text-slate-500"}`}>
+              <FileSearch size={18} />
             </div>
             <div>
-              <span className={`block text-xs font-black tracking-tight ${singlePage ? "text-zinc-100" : "text-zinc-400"}`}>Point Scan</span>
-              <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Target URL Only</span>
+              <span className={`block text-sm font-medium ${singlePage ? "text-blue-100" : "text-slate-300"}`}>Point Scan</span>
+              <span className="text-xs text-slate-500 mt-0.5 block">Target URL Only</span>
             </div>
           </button>
+          
           <button
             type="button"
             onClick={() => setSinglePage(false)}
-            className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+            className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
               !singlePage
-                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                : "border-white/5 bg-transparent text-zinc-500 hover:border-white/10 hover:bg-white/[0.02]"
+                ? "border-blue-500/50 bg-blue-500/10"
+                : "border-white/5 bg-[#0A0A0B] hover:border-white/10"
             }`}
           >
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-all ${!singlePage ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" : "bg-zinc-800/50 text-zinc-600 ring-white/5"}`}>
-              <Layers size={16} />
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${!singlePage ? "bg-blue-500/20 text-blue-400" : "bg-slate-900 text-slate-500"}`}>
+              <Layers size={18} />
             </div>
             <div>
-              <span className={`block text-xs font-black tracking-tight ${!singlePage ? "text-zinc-100" : "text-zinc-400"}`}>Recursive Crawl</span>
-              <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Deep Network Probe</span>
+              <span className={`block text-sm font-medium ${!singlePage ? "text-blue-100" : "text-slate-300"}`}>Recursive Crawl</span>
+              <span className="text-xs text-slate-500 mt-0.5 block">Full Network Probe</span>
             </div>
           </button>
         </div>
       </div>
 
-      <div>
+      <div className="space-y-3">
         <label
           htmlFor="maxPayloads"
-          className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500"
+          className="flex items-center justify-between text-sm font-medium text-slate-300"
         >
-          Payload Density
+          <span>Payload Density</span>
+          <span className="text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded text-xs">{maxPayloads} req/param</span>
         </label>
         <input
           id="maxPayloads"
-          type="number"
+          type="range"
           min={5}
           max={200}
+          step={5}
           value={maxPayloads}
           onChange={(e) => setMaxPayloads(Number(e.target.value))}
-          className="w-full rounded-xl border border-white/5 bg-zinc-800/20 px-4 py-3 text-xs text-zinc-100 outline-none transition-all focus:border-emerald-500/30 hover:border-white/10"
+          className="w-full accent-blue-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       {error && (
-        <p className="rounded-lg bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 ring-1 ring-red-500/20 italic">
-          {error}
-        </p>
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-md bg-red-500/10 p-3 border border-red-500/20"
+        >
+          <p className="text-sm font-medium text-red-400 flex items-center gap-2">
+            <ShieldAlert size={16} />
+            {error}
+          </p>
+        </motion.div>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-emerald-600 px-5 py-4 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-emerald-500 hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] disabled:opacity-50 active:scale-[0.98]"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Crosshair size={16} className={loading ? "animate-spin" : ""} />
-        {loading ? "Engaging..." : "Initialize Audit"}
+        {loading ? "Engaging Protocol..." : "Create Scan"}
       </button>
     </form>
   );

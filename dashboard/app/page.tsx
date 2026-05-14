@@ -1,59 +1,93 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
+import useSWR from "swr";
 import { listScans, deleteAllScans } from "@/lib/api";
 import type { Scan } from "@/lib/types";
 import { ScanStatus } from "@/lib/types";
 import { NewScanForm } from "@/components/new-scan-form";
 import { ScanTable } from "@/components/scan-table";
 import { useScanSocket } from "@/hooks/use-scan-socket";
-import { Activity, Plus } from "lucide-react";
+import { Activity, Plus, Server, ShieldCheck, Bug, Zap, LayoutGrid } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardPage() {
-  const [scans, setScans] = useState<Scan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [clearingAll, setClearingAll] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Initialize socket for real-time updates
+  // SWR for initial fetch, background revalidation, and caching
+  const { data: scans = [], mutate, isLoading } = useSWR<Scan[]>(
+    "scans",
+    () => listScans(),
+    { fallbackData: [] }
+  );
+
+  // Initialize socket for real-time updates and mutate SWR cache optimally
   useScanSocket({
-    onProgress: (e) => setScans((prev) => prev.map((s) => s.id === e.scanId ? { ...s, progress: e.progress, phase: e.phase } : s)),
-    onComplete: (e) => setScans((prev) => prev.map((s) => s.id === e.scanId ? { ...s, status: ScanStatus.DONE, progress: 100 } : s)),
-    onError: (e) => setScans((prev) => prev.map((s) => s.id === e.scanId ? { ...s, status: ScanStatus.FAILED, error: e.message } : s)),
+    onProgress: (e) => {
+      mutate((prev = []) => prev.map((s) => s.id === e.scanId ? { ...s, progress: e.progress, phase: e.phase } : s), { revalidate: false });
+    },
+    onComplete: (e) => {
+      mutate((prev = []) => prev.map((s) => s.id === e.scanId ? { ...s, status: ScanStatus.DONE, progress: 100 } : s), { revalidate: false });
+    },
+    onError: (e) => {
+      mutate((prev = []) => prev.map((s) => s.id === e.scanId ? { ...s, status: ScanStatus.FAILED, error: e.message } : s), { revalidate: false });
+    },
   });
 
-  // Initial fetch
-  useEffect(() => {
-    async function fetchScans() {
-      try {
-        const data = await listScans();
-        setScans(data);
-      } catch (err) {
-        console.error("Failed to fetch scans:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchScans();
-  }, []);
-
   const handleScanCreated = useCallback((scan: Scan) => {
-    setScans((prev) => [scan, ...prev]);
+    // Optimistic update
+    mutate(async () => {
+      // The scan is already created on backend by the form, just fetching might be slow so we optimistically prepend.
+      return [scan, ...scans];
+    }, {
+      optimisticData: [scan, ...scans],
+      rollbackOnError: true,
+      populateCache: true,
+      revalidate: false,
+    });
     setIsDrawerOpen(false);
-  }, []);
+  }, [mutate, scans]);
 
   const handleClearAll = async () => {
     if (!confirm("Are you sure you want to clear all scans? This cannot be undone.")) return;
     setClearingAll(true);
-    try {
-      await deleteAllScans();
-      setScans([]);
-    } catch (err) {
+    
+    // Optimistic update
+    mutate(
+      async () => {
+        await deleteAllScans();
+        return [];
+      },
+      {
+        optimisticData: [],
+        rollbackOnError: true,
+        populateCache: true,
+        revalidate: false,
+      }
+    ).catch((err) => {
       console.error("Failed to clear scans:", err);
-    } finally {
+    }).finally(() => {
       setClearingAll(false);
-    }
+    });
   };
+
+  const handleDeleteScan = useCallback((id: string) => {
+    // Optimistic update
+    mutate(
+      async () => {
+        // deleteScan is called by the child component, we just update cache.
+        // Actually the child calls API directly, we just trust it and filter.
+        return scans.filter((s) => s.id !== id);
+      },
+      {
+        optimisticData: scans.filter((s) => s.id !== id),
+        rollbackOnError: true,
+        populateCache: true,
+        revalidate: false,
+      }
+    );
+  }, [mutate, scans]);
 
   // Derived stats
   const activeScans = scans.filter(
@@ -62,105 +96,138 @@ export default function DashboardPage() {
   const totalVulns = scans.reduce((sum, s) => sum + (s.vulns?.length ?? 0), 0);
   const completedScans = scans.filter((s) => s.status === ScanStatus.DONE).length;
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="size-2 rounded-full bg-emerald-500 animate-ping" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Synchronizing Hub...</span>
-        </div>
+      <div className="flex h-[60vh] items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="relative size-8 flex items-center justify-center">
+            <div className="absolute inset-0 border-2 border-blue-500 rounded-full animate-spin border-t-transparent" />
+          </div>
+          <span className="text-sm font-medium text-slate-400">
+            Loading data...
+          </span>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="space-y-8"
+    >
       {/* ── Page Header ───────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-zinc-100 uppercase">Operational Dashboard</h1>
-          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mt-1">Real-time vulnerability orchestration</p>
+          <h1 className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
+            <LayoutGrid size={24} className="text-blue-500" />
+            Dashboard
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Overview of your security infrastructure and active tasks.
+          </p>
         </div>
         
         <button
           onClick={() => setIsDrawerOpen(true)}
-          className="flex items-center gap-3 rounded-lg bg-emerald-500 px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all hover:bg-emerald-400 hover:scale-[1.02] active:scale-[0.98]"
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
         >
-          <Plus size={14} strokeWidth={3} />
-          Initialize Audit
+          <Plus size={16} />
+          New Scan
         </button>
       </div>
 
       {/* ── Metrics Strip ────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MiniStat label="Live Audit Pipelines" value={activeScans} status="active" />
-        <MiniStat label="Threats Defused" value={completedScans} status="secure" />
-        <MiniStat label="Security Breaches" value={totalVulns} status="danger" />
-        <MiniStat label="System Uptime" value="99.98%" status="stable" />
+        <MiniStat label="Active Scans" value={activeScans} status="active" icon={<Server size={18} />} />
+        <MiniStat label="Completed" value={completedScans} status="secure" icon={<ShieldCheck size={18} />} />
+        <MiniStat label="Vulnerabilities" value={totalVulns} status="danger" icon={<Bug size={18} />} />
+        <MiniStat label="System Status" value="99.9%" status="stable" icon={<Zap size={18} />} />
       </div>
 
       {/* ── Operational Activity ───────────────────────── */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-3">
-            <Activity size={14} className="text-emerald-500" />
-            <h2 className="text-xs font-black tracking-[0.2em] text-zinc-400 uppercase">Audit Log & Stream</h2>
-          </div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium text-slate-200">Recent Scans</h2>
           {scans.length > 0 && (
             <button
               onClick={handleClearAll}
               disabled={clearingAll}
-              className="text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-red-400 transition-colors"
+              className="text-sm text-slate-500 hover:text-red-400 transition-colors"
             >
-              {clearingAll ? "Purging..." : "System Purge"}
+              {clearingAll ? "Clearing..." : "Clear All"}
             </button>
           )}
         </div>
         
-        <div className="technical-border rounded-xl bg-zinc-950/40 p-1 overflow-hidden">
-          <ScanTable scans={scans} onDelete={(id) => setScans((prev) => prev.filter((s) => s.id !== id))} />
+        <div className="rounded-xl bg-[#111113] border border-white/5 overflow-hidden">
+          <ScanTable scans={scans} onDelete={handleDeleteScan} />
         </div>
       </div>
 
       {/* ── Command Drawer ─────────────────────────────── */}
-      {isDrawerOpen && (
-        <div className="fixed inset-0 z-[60] flex justify-end">
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
-            onClick={() => setIsDrawerOpen(false)}
-          />
-          <div className="relative z-[70] h-full w-full max-w-md bg-[#0a0a0a] border-l border-white/5 shadow-2xl animate-in slide-in-from-right duration-500">
-            <div className="flex h-16 items-center justify-between border-b border-white/5 px-8">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-100">Initialize Asset Audit</span>
-              <button onClick={() => setIsDrawerOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
-                <Plus size={20} className="rotate-45" />
-              </button>
-            </div>
-            <div className="p-8">
-              <NewScanForm onCreated={handleScanCreated} />
-            </div>
+      <AnimatePresence>
+        {isDrawerOpen && (
+          <div className="fixed inset-0 z-[60] flex justify-end">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#0A0A0B]/80 backdrop-blur-sm"
+              onClick={() => setIsDrawerOpen(false)}
+            />
+            <motion.div 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative z-[70] h-full w-full max-w-md bg-[#111113] border-l border-white/10 flex flex-col shadow-2xl"
+            >
+              <div className="flex h-16 items-center justify-between border-b border-white/5 px-6">
+                <span className="text-sm font-semibold text-slate-200">Create New Scan</span>
+                <button 
+                  onClick={() => setIsDrawerOpen(false)} 
+                  className="p-2 rounded-md hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                >
+                  <Plus size={20} className="rotate-45" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <NewScanForm onCreated={handleScanCreated} />
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
-function MiniStat({ label, value, status }: { label: string; value: string | number; status: string }) {
-  const statusColors = {
-    active: "bg-blue-500",
-    secure: "bg-emerald-500",
-    danger: "bg-red-500",
-    stable: "bg-zinc-500",
+function MiniStat({ label, value, status, icon }: { label: string; value: string | number; status: string; icon?: React.ReactNode }) {
+  const styles = {
+    active: { bg: "bg-blue-500/10", text: "text-blue-500", border: "border-white/5" },
+    secure: { bg: "bg-emerald-500/10", text: "text-emerald-500", border: "border-white/5" },
+    danger: { bg: "bg-red-500/10", text: "text-red-500", border: "border-white/5" },
+    stable: { bg: "bg-slate-500/10", text: "text-slate-400", border: "border-white/5" },
   };
 
+  const style = styles[status as keyof typeof styles];
+
   return (
-    <div className="technical-border rounded-xl bg-zinc-900/10 p-4 transition-all hover:bg-zinc-900/30 group cursor-default">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`size-1.5 rounded-full ${statusColors[status as keyof typeof statusColors]} group-hover:animate-pulse`} />
-        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 group-hover:text-zinc-400 transition-colors uppercase">{label}</span>
+    <div className={`rounded-xl bg-[#111113] border ${style.border} p-5`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium text-slate-400">{label}</span>
+        <div className={`p-2 rounded-md ${style.bg} ${style.text}`}>
+          {icon}
+        </div>
       </div>
-      <div className="text-2xl font-black tracking-tighter text-zinc-100 font-mono">
+      <div className="text-3xl font-semibold text-slate-100">
         {value}
       </div>
     </div>
