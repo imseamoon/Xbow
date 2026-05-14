@@ -98,6 +98,23 @@ DOM_SINKS = {
     },
 }
 
+# default suggested payloads keyed by sink name. keeps payload selection
+# explicit and easy to adjust. prioritize the reliable `img onerror` payload
+# for html insertion sinks.
+SUGGESTED_PAYLOADS = {
+    "innerHTML": "<img src=x onerror=alert(1)>",
+    "outerHTML": "<img src=x onerror=alert(1)>",
+    "insertAdjacentHTML": "<img src=x onerror=alert(1)>",
+    "jQuery_html": "<img src=x onerror=alert(1)>",
+    "jQuery_append": "<img src=x onerror=alert(1)>",
+    "document.write": "<img src=x onerror=alert(1)>",
+    "document.writeln": "<img src=x onerror=alert(1)>",
+    "src_assign": "<img src=x onerror=alert(1)>",
+    "href_assign": "<img src=x onerror=alert(1)>",
+    # fallback generic payloads for other types
+    "default_html": "<img src=x onerror=alert(1)>",
+    "default_js": "alert(1)",
+}
 # tainted sources — user-controlled input that flows into sinks
 TAINTED_SOURCES = [
     # Location object - all properties are user-controlled via URL
@@ -483,16 +500,16 @@ def _scan_single_script(content: str, script_url: str) -> list[DomXssFinding]:
                 if not has_source:
                     continue
 
-                # Determine suggested payload based on sink type
-                suggested_payload = ""
-                if sink_info["type"] == "execution":
-                    suggested_payload = "alert(1)"
-                elif sink_info["type"] == "html":
-                    suggested_payload = "<img src=x onerror=alert(1)>"
-                elif sink_info["type"] == "js_uri":
-                    suggested_payload = "javascript:alert(1)"
-                elif sink_info["type"] == "url":
-                    suggested_payload = "https://example.com"
+                # Determine suggested payload based on sink name (more explicit)
+                suggested_payload = SUGGESTED_PAYLOADS.get(sink_name)
+                if not suggested_payload:
+                    # fall back on type-based heuristics
+                    if sink_info.get("type") in ("dom_xss", "html"):
+                        suggested_payload = SUGGESTED_PAYLOADS.get("default_html")
+                    elif sink_info.get("type") == "execution":
+                        suggested_payload = SUGGESTED_PAYLOADS.get("default_js")
+                    else:
+                        suggested_payload = ""
 
                 findings.append(DomXssFinding(
                     sink_name=sink_name,

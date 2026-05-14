@@ -168,27 +168,48 @@ async def _verify_one(
             async def handle_dialog(dialog: Dialog):
                 dialog_info["triggered"] = True
                 dialog_info["message"] = dialog.message
+                # also mark the execution flag so returned result is consistent
+                try:
+                    execution_flags["alert_called"] = True
+                except Exception:
+                    pass
                 await dialog.dismiss()
 
             page.on("dialog", handle_dialog)
 
-            # capture console errors
-            page.on("console", lambda msg: (
-                console_errors.append(msg.text)
-                if msg.type == "error" else None
-            ))
+            # capture console messages and look for our alert marker
+            def _on_console(msg):
+                try:
+                    text = msg.text
+                except Exception:
+                    return
+                if msg.type == "error":
+                    console_errors.append(text)
+                if text and text.startswith("[xss-verifier-alert]"):
+                    try:
+                        execution_flags["alert_called"] = True
+                        dialog_info["triggered"] = True
+                        dialog_info["message"] = text.replace("[xss-verifier-alert]", "")
+                    except Exception:
+                        pass
+
+            page.on("console", _on_console)
 
             # inject execution tracking before payload
             try:
                 await page.add_init_script("""
+                    // XSS verifier helper object
                     window._xss_verification = {
                         alert_called: false,
                         script_executed: false,
-                        original_alert: window.alert
+                        last_alert: null
                     };
+                    // override alert to reliably mark execution and emit a console marker
                     window.alert = function(msg) {
-                        window._xss_verification.alert_called = true;
-                        return window._xss_verification.original_alert.call(window, msg);
+                        try { window._xss_verification.alert_called = true; } catch(e){}
+                        try { window._xss_verification.last_alert = String(msg); } catch(e){}
+                        try { console.log('[xss-verifier-alert]'+String(msg)); } catch(e){}
+                        // do not call original alert to avoid blocking in headless
                     };
                     window._xss_verification.script_executed = true;
                 """)
@@ -358,6 +379,30 @@ async def _attempt_user_interactions(page, payload: str, param: str) -> None:
 
         # Give handlers a short window to execute.
         await page.wait_for_timeout(400)
+        # Force-dispatch load/error events on elements that have inline handlers
+        try:
+            await page.evaluate("""() => {
+                const imgs = Array.from(document.querySelectorAll('img[onerror]'));
+                for (const img of imgs) {
+                    try {
+                        try { img.src = 'about:invalid#xss'; } catch(e){}
+                        img.dispatchEvent(new Event('error', { bubbles: true }));
+                    } catch(e){}
+                }
+                const svgs = Array.from(document.querySelectorAll('svg[onload]'));
+                for (const s of svgs) {
+                    try { s.dispatchEvent(new Event('load', { bubbles: true })); } catch(e){}
+                }
+                const others = Array.from(document.querySelectorAll('[onload],[onerror]'));
+                for (const el of others) {
+                    try {
+                        if (el.hasAttribute('onerror')) el.dispatchEvent(new Event('error', { bubbles: true }));
+                        if (el.hasAttribute('onload')) el.dispatchEvent(new Event('load', { bubbles: true }));
+                    } catch(e){}
+                }
+            }""")
+        except Exception:
+            pass
     except Exception:
         # best-effort helper: verification should not fail due to interaction attempts
         return
@@ -369,14 +414,15 @@ def _payload_suggests_execution(payload: str) -> bool:
     """
     payload_lower = payload.lower()
     
-    # payloads with guaranteed-to-execute event handlers
+    # payloads with indicators that suggest execution without user interaction
     executing_indicators = [
         'alert(',      # direct function call
         'prompt(',     # direct function call
         'confirm(',    # direct function call
         'console.log(', # safe execution marker
         'eval(',       # definitely executes
-        'svg/onload',  # svg construction - onload fires on insert
+        'onerror',     # img/audio/video onerror handlers
+        'onload',      # svg/body onload handlers
     ]
     
     for indicator in executing_indicators:

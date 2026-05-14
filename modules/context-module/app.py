@@ -150,6 +150,16 @@ async def analyze(req: AnalyzeRequest) -> dict[str, ParamContext]:
             final_context = regex_context
             final_confidence = max(0.5, ai_confidence)
 
+        # --- heuristic override: when reflection snippet or response body
+        # contains element/event indicators (img/svg/onerror/onload/innerHTML),
+        # prefer an HTML/body context so payload-gen will try element-based
+        # payloads (e.g., <img onerror=...>). This reduces misses where
+        # AI/regex might label a reflection as generic 'attribute' or 'none'.
+        combined_text = (snippet or "") + "\n" + (body or "")
+        if re.search(r"onerror|onload|<img\b|<svg\b|innerHTML|insertAdjacentHTML|\.html\(|append\(|createElement\(|document\.write", combined_text, flags=re.IGNORECASE):
+            final_context = "html_body"
+            final_confidence = max(final_confidence, 0.85)
+
         # step 5: fuzz which special chars survive
         # char fuzzing is query-based and does not apply to synthetic fragment param
         if param == FRAGMENT_PARAM:
