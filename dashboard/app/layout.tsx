@@ -31,7 +31,7 @@ export default function RootLayout({
           <aside className="fixed inset-y-0 left-0 z-50 w-64 flex-col border-r border-slate-200 bg-white hidden md:flex">
             <div className="p-6">
               <div className="flex items-center gap-3">
-                <div className="size-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-sm">
+                <div className="size-8 rounded-lg bg-gradi ent-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-sm">
                   <Shield size={18} className="text-white" />
                 </div>
                 <span className="font-bold text-slate-800 tracking-wide">RedSentinel</span>
@@ -66,7 +66,7 @@ export default function RootLayout({
               </div>
             </header>
 
-            <div className="flex-1 p-6 md:p-8 max-w-[1400px] w-full mx-auto">
+            <div className="flex-1 p-6 md:p-8 max-w-350 w-full mx-auto">
               {children}
             </div>
           </main>
