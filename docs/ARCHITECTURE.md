@@ -34,7 +34,56 @@ for AI inference, context analysis, payload generation, and fuzzing.
 
 ---
 
-## 3. High-Level Architecture
+## 3. Database Schema
+
+The application persists domain data in two tables only: `scans` and `vulns`.
+TypeORM also maintains its own migration ledger in `typeorm_migrations`, but
+that table is framework metadata rather than a product model.
+
+```mermaid
+erDiagram
+  SCANS {
+    uuid id PK
+    varchar url
+    varchar status
+    varchar phase
+    int progress
+    jsonb options
+    text error
+    timestamp createdAt
+    timestamp updatedAt
+    timestamp completedAt
+  }
+
+  VULNS {
+    uuid id PK
+    uuid scanId FK
+    varchar url
+    varchar param
+    text payload
+    varchar type
+    varchar severity
+    boolean reflected
+    boolean executed
+    jsonb evidence
+    timestamp discoveredAt
+  }
+
+  SCANS ||--o{ VULNS : contains
+```
+
+### Domain Notes
+
+| Table | Purpose |
+|-------|---------|
+| `scans` | Scan lifecycle state, progress, config, and terminal outcome |
+| `vulns` | Findings discovered during a scan, keyed back to a scan |
+
+`ScanStatus`, `ScanPhase`, `VulnType`, and `VulnSeverity` are enum-like application values stored as `varchar` columns.
+
+---
+
+## 4. High-Level Architecture
 
 ```diagram
 
@@ -93,7 +142,7 @@ for AI inference, context analysis, payload generation, and fuzzing.
 
 ---
 
-## 4. Scan Pipeline — 5 Phases
+## 5. Scan Pipeline — 5 Phases
 
 Every scan flows through exactly 5 sequential phases, all orchestrated by NestJS Core.
 
@@ -138,9 +187,9 @@ Phase 5: REPORT         (NestJS — Report Service)
 
 ---
 
-## 5. Service Responsibilities
+## 6. Service Responsibilities
 
-### 5.1 NestJS Core — The Brain
+### 6.1 NestJS Core — The Brain
 
 **Role:** Orchestration, routing, state, real-time communication
 **Port:** 3000
@@ -177,7 +226,7 @@ Total → Severity: 8+ CRITICAL, 6-7 HIGH, 4-5 MEDIUM, 0-3 LOW
 
 **Deduplication:** Composite key format `page::source::sink` prevents duplicate findings for the same injection point.
 
-### 5.2 Context Module — Python :5001
+### 6.2 Context Module — Python :5001
 
 **Role:** Determine where and how input is reflected
 **Model:** DistilBERT (fine-tuned XSS context classifier)
@@ -199,7 +248,7 @@ Total → Severity: 8+ CRITICAL, 6-7 HIGH, 4-5 MEDIUM, 0-3 LOW
 - `url` — reflected in a `href` or `src`
 - `none` — not reflected / filtered
 
-### 5.3 Payload-Gen Module — Python :5002
+### 6.3 Payload-Gen Module — Python :5002
 
 **Role:** Select and mutate payloads based on context + WAF
 **Payload Bank:** 59,000+ curated + synthetic XSS payloads
@@ -214,7 +263,7 @@ Total → Severity: 8+ CRITICAL, 6-7 HIGH, 4-5 MEDIUM, 0-3 LOW
 | `xgboost_ranker.py` | ML-powered payload ranking using XGBoost           |
 | `feature_extractor.py` | Converts payload+context into ~30 features for XGBoost |
 
-### 5.4 Fuzzer Module — Python :5003
+### 6.4 Fuzzer Module — Python :5003
 
 **Role:** Execute payloads and confirm vulnerabilities
 **Browser Engine:** Playwright (Chromium headless)
@@ -228,9 +277,9 @@ Total → Severity: 8+ CRITICAL, 6-7 HIGH, 4-5 MEDIUM, 0-3 LOW
 
 ---
 
-## 6. API Contracts (Inter-Service)
+## 7. API Contracts (Inter-Service)
 
-### 6.1 Core → Context Module
+### 7.1 Core → Context Module
 
 ```bash
 
@@ -259,7 +308,7 @@ Response:
 
 ```
 
-### 6.2 Core → Payload-Gen Module
+### 7.2 Core → Payload-Gen Module
 
 ```bash
 
@@ -297,7 +346,7 @@ Response:
 
 ```
 
-### 6.3 Core → Fuzzer Module
+### 7.3 Core → Fuzzer Module
 
 ```bash
 
@@ -338,7 +387,7 @@ Response:
 
 ```
 
-### 6.4 WebSocket Events (Core → Client)
+### 7.4 WebSocket Events (Core → Client)
 
 ```c
 
@@ -377,7 +426,7 @@ Event: scan:complete
 
 ---
 
-## 7. REST API Reference (NestJS Core)
+## 8. REST API Reference (NestJS Core)
 
 | Method | Endpoint              | Description                         |
 |--------|-----------------------|-------------------------------------|
@@ -407,7 +456,7 @@ Event: scan:complete
 
 ---
 
-## 8. Folder Structure
+## 9. Folder Structure
 
 ```bash
 red-sentinel/
@@ -544,7 +593,7 @@ red-sentinel/
 
 ---
 
-## 9. Docker Compose
+## 10. Docker Compose
 
 ```yaml
 version: '3.8'
@@ -634,7 +683,7 @@ volumes:
 
 ---
 
-## 10. Development Roadmap
+## 11. Development Roadmap
 
 | Phase | Days   | Stack           | Deliverable                                    | Status   |
 |-------|--------|-----------------|------------------------------------------------|----------|
@@ -653,7 +702,7 @@ volumes:
 
 ---
 
-## 11. Key Design Decisions
+## 12. Key Design Decisions
 
 | Decision                     | Choice                  | Rationale                                          |
 |------------------------------|-------------------------|----------------------------------------------------|
@@ -668,7 +717,7 @@ volumes:
 
 ---
 
-## 12. Environment Variables
+## 13. Environment Variables
 
 ```bash
 # Core (NestJS)
