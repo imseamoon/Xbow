@@ -75,3 +75,5 @@ core/coverage-e2e/
 reports/
 
 .setup.log
+
+dump.rdb
