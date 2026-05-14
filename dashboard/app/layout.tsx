@@ -37,7 +37,7 @@ export default function RootLayout({
                 <span className="font-bold text-slate-800 tracking-wide">RedSentinel</span>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto py-4 px-4">
               <div className="text-xs font-semibold text-slate-400 mb-4 px-2 uppercase tracking-widest">Menu</div>
               <nav className="flex flex-col gap-2">
@@ -78,11 +78,10 @@ export default function RootLayout({
 
 function SidebarLink({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }) {
   return (
-    <div className={`w-full rounded-lg flex items-center gap-3 px-3 py-2.5 transition-all duration-200 cursor-pointer ${
-      active 
-        ? "bg-pink-50 text-pink-600 font-medium shadow-sm border border-pink-100" 
+    <div className={`w-full rounded-lg flex items-center gap-3 px-3 py-2.5 transition-all duration-200 cursor-pointer ${active
+        ? "bg-pink-50 text-pink-600 font-medium shadow-sm border border-pink-100"
         : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium border border-transparent"
-    }`}>
+      }`}>
       {icon}
       <span className="text-sm">{label}</span>
     </div>

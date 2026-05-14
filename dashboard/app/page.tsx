@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const handleClearAll = async () => {
     if (!confirm("Are you sure you want to clear all scans? This cannot be undone.")) return;
     setClearingAll(true);
-    
+
     // Optimistic update
     mutate(
       async () => {
@@ -99,7 +99,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center gap-4"
@@ -116,7 +116,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -133,7 +133,7 @@ export default function DashboardPage() {
             Overview of your security infrastructure and active tasks.
           </p>
         </div>
-        
+
         <button
           onClick={() => setIsDrawerOpen(true)}
           className="flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-pink-700 shadow-sm"
@@ -164,7 +164,7 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
-        
+
         <div className="rounded-xl bg-white border border-slate-200 overflow-hidden shadow-sm">
           <ScanTable scans={scans} onDelete={handleDeleteScan} />
         </div>
@@ -174,14 +174,14 @@ export default function DashboardPage() {
       <AnimatePresence>
         {isDrawerOpen && (
           <div className="fixed inset-0 z-[60] flex justify-end">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm"
               onClick={() => setIsDrawerOpen(false)}
             />
-            <motion.div 
+            <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
@@ -190,8 +190,8 @@ export default function DashboardPage() {
             >
               <div className="flex h-16 items-center justify-between border-b border-slate-100 px-6">
                 <span className="text-sm font-semibold text-slate-900">Create New Scan</span>
-                <button 
-                  onClick={() => setIsDrawerOpen(false)} 
+                <button
+                  onClick={() => setIsDrawerOpen(false)}
                   className="p-2 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   <Plus size={20} className="rotate-45" />
