@@ -53,7 +53,8 @@ export function getShareabilityScore(input: ScoringInput): number {
   const s = (input.source ?? '').toLowerCase();
 
   // URL param (server-reflected query param) = highest shareability
-  if (s === 'url_param' || s === 'url param' || s === 'url' || s === '') return 3;
+  if (s === 'url_param' || s === 'url param' || s === 'url' || s === '')
+    return 3;
   // postMessage / e.data = moderate shareability
   if (s === 'postmessage' || s === 'e.data') return 2;
   // Client-side JS sources (DOM-based) = lower shareability
@@ -220,11 +221,15 @@ export function scoreFinding(input: ScoringInput): ScoringResult {
  * Derive sink from reflectionPosition when an explicit sink is not provided
  * by the fuzzer module.
  */
-export function deriveSink(reflectionPosition: string, explicitSink?: string): string {
+export function deriveSink(
+  reflectionPosition: string,
+  explicitSink?: string,
+): string {
   if (explicitSink) return explicitSink;
   const pos = (reflectionPosition ?? '').toLowerCase();
   if (pos === 'script') return 'script';
-  if (pos === 'innerhtml' || pos === 'html_body' || pos === 'body') return 'innerHTML';
+  if (pos === 'innerhtml' || pos === 'html_body' || pos === 'body')
+    return 'innerHTML';
   if (pos === 'href') return 'href';
   if (pos === 'attribute') return 'attribute';
   return pos || 'attribute';

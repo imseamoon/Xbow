@@ -292,7 +292,12 @@ describe('ScanService', () => {
 
     it('cancels a crawling scan', async () => {
       const scan = await service.create({ url: 'https://example.com' });
-      await service.updateStatus(scan.id, ScanStatus.CRAWLING, ScanPhase.CRAWL, 10);
+      await service.updateStatus(
+        scan.id,
+        ScanStatus.CRAWLING,
+        ScanPhase.CRAWL,
+        10,
+      );
       const cancelled = await service.cancel(scan.id);
       expect(cancelled.status).toBe(ScanStatus.CANCELLED);
     });
@@ -300,13 +305,17 @@ describe('ScanService', () => {
     it('throws ScanCancelException for a completed scan', async () => {
       const scan = await service.create({ url: 'https://example.com' });
       await service.updateStatus(scan.id, ScanStatus.DONE);
-      await expect(service.cancel(scan.id)).rejects.toThrow(ScanCancelException);
+      await expect(service.cancel(scan.id)).rejects.toThrow(
+        ScanCancelException,
+      );
     });
 
     it('throws ScanCancelException for a failed scan', async () => {
       const scan = await service.create({ url: 'https://example.com' });
       await service.markFailed(scan.id, 'some error');
-      await expect(service.cancel(scan.id)).rejects.toThrow(ScanCancelException);
+      await expect(service.cancel(scan.id)).rejects.toThrow(
+        ScanCancelException,
+      );
     });
   });
 
@@ -326,7 +335,12 @@ describe('ScanService', () => {
 
     it('throws ScanAlreadyRunningException when starting already running scan', async () => {
       const scan = await service.create({ url: 'https://example.com' });
-      await service.updateStatus(scan.id, ScanStatus.CRAWLING, ScanPhase.CRAWL, 10);
+      await service.updateStatus(
+        scan.id,
+        ScanStatus.CRAWLING,
+        ScanPhase.CRAWL,
+        10,
+      );
       await expect(
         service.updateStatus(scan.id, ScanStatus.CRAWLING),
       ).rejects.toThrow(ScanAlreadyRunningException);
@@ -372,7 +386,9 @@ describe('ScanService', () => {
       });
 
       await service.deleteScan(scan.id);
-      await expect(service.findOne(scan.id)).rejects.toThrow(ScanNotFoundException);
+      await expect(service.findOne(scan.id)).rejects.toThrow(
+        ScanNotFoundException,
+      );
     });
 
     it('throws for unknown scan id', async () => {

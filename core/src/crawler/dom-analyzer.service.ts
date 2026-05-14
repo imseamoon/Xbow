@@ -63,7 +63,11 @@ export class DomAnalyzerService {
         // (e.g. location.hash, substring/hash routing, dynamic script include).
         if (!seen.has(`fragment:${FRAGMENT_PARAM}`)) {
           seen.add(`fragment:${FRAGMENT_PARAM}`);
-          params.push({ name: FRAGMENT_PARAM, source: 'fragment', method: 'GET' });
+          params.push({
+            name: FRAGMENT_PARAM,
+            source: 'fragment',
+            method: 'GET',
+          });
         }
 
         const fragParams = new URLSearchParams(u.hash.slice(1));
@@ -80,7 +84,10 @@ export class DomAnalyzerService {
 
     // If the page script references location.hash, create a synthetic fragment
     // parameter even when current URL has no hash yet.
-    if (/location\.hash/i.test(html) && !seen.has(`fragment:${FRAGMENT_PARAM}`)) {
+    if (
+      /location\.hash/i.test(html) &&
+      !seen.has(`fragment:${FRAGMENT_PARAM}`)
+    ) {
       seen.add(`fragment:${FRAGMENT_PARAM}`);
       params.push({ name: FRAGMENT_PARAM, source: 'fragment', method: 'GET' });
     }

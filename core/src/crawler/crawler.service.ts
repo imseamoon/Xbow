@@ -60,7 +60,8 @@ export class CrawlerService implements OnModuleDestroy {
       { url, currentDepth: 0 },
     ];
     const allParams: DiscoveredParam[] = [];
-    const allForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] = [];
+    const allForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] =
+      [];
     const allScripts: string[] = [];
     const paramNames = new Set<string>();
     const formKeys = new Set<string>();
@@ -70,10 +71,7 @@ export class CrawlerService implements OnModuleDestroy {
       this.config.get<number>('CRAWLER_MAX_URLS', 80),
       10,
     );
-    const crawlTimeoutMs = this.config.get<number>(
-      'CRAWLER_TIMEOUT_MS',
-      60000,
-    );
+    const crawlTimeoutMs = this.config.get<number>('CRAWLER_TIMEOUT_MS', 60000);
     const visitedPatterns = new Map<string, number>();
 
     const browser = await this.getBrowser();
@@ -174,7 +172,10 @@ export class CrawlerService implements OnModuleDestroy {
             const effectiveUrl = frameUrl || item.url;
 
             // extract params
-            const frameParams = this.domAnalyzer.extractParams(effectiveUrl, frameHtml);
+            const frameParams = this.domAnalyzer.extractParams(
+              effectiveUrl,
+              frameHtml,
+            );
             for (const p of frameParams) {
               if (!paramNames.has(p.name) && paramNames.size < maxParams) {
                 paramNames.add(p.name);
@@ -183,7 +184,10 @@ export class CrawlerService implements OnModuleDestroy {
             }
 
             // extract forms
-            const frameForms = this.domAnalyzer.extractForms(frameHtml, effectiveUrl);
+            const frameForms = this.domAnalyzer.extractForms(
+              frameHtml,
+              effectiveUrl,
+            );
             for (const form of frameForms) {
               const formKey = `${form.action}|${form.method}|${form.fields.sort().join(',')}`;
               if (!formKeys.has(formKey)) {
@@ -210,10 +214,13 @@ export class CrawlerService implements OnModuleDestroy {
                 try {
                   const absUrl = new URL(src, effectiveUrl).toString();
                   if (isSameDomain(url, absUrl)) {
-                    const text = await frame.evaluate(async (scriptUrl: string) => {
-                      const r = await fetch(scriptUrl);
-                      return r.text();
-                    }, absUrl);
+                    const text = await frame.evaluate(
+                      async (scriptUrl: string) => {
+                        const r = await fetch(scriptUrl);
+                        return r.text();
+                      },
+                      absUrl,
+                    );
                     allScripts.push(text);
                   }
                 } catch {
@@ -242,7 +249,10 @@ export class CrawlerService implements OnModuleDestroy {
                     isSameDomain(url, link) &&
                     !visited.has(this.normalizeForVisit(link))
                   ) {
-                    toVisit.push({ url: link, currentDepth: item.currentDepth + 1 });
+                    toVisit.push({
+                      url: link,
+                      currentDepth: item.currentDepth + 1,
+                    });
                   }
                 }
               } catch {

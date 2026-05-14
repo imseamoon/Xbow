@@ -7,7 +7,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { io, Socket } from 'socket.io-client';
-import { ScanGateway, ProgressPayload, FindingPayload, CompletePayload } from '../src/scan/scan.gateway';
+import {
+  ScanGateway,
+  ProgressPayload,
+  FindingPayload,
+  CompletePayload,
+} from '../src/scan/scan.gateway';
 import { ScanPhase } from '../src/common/interfaces/scan.interface';
 
 describe('websocket events (integration)', () => {
@@ -133,9 +138,13 @@ describe('websocket events (integration)', () => {
   });
 
   it('receives scan:error events', async () => {
-    const received = new Promise<{ scanId: string; message: string }>((resolve) => {
-      client.on('scan:error', (data: { scanId: string; message: string }) => resolve(data));
-    });
+    const received = new Promise<{ scanId: string; message: string }>(
+      (resolve) => {
+        client.on('scan:error', (data: { scanId: string; message: string }) =>
+          resolve(data),
+        );
+      },
+    );
 
     await new Promise((r) => setTimeout(r, 50));
     gateway.emitError('scan-fail', 'context module timeout');

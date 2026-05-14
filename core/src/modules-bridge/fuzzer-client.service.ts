@@ -12,12 +12,12 @@ export interface TestRequest {
   timeout: number;
   /** Stored XSS support — url becomes the store (form action) URL */
   storedMode?: boolean;
-  displayUrl?: string;          // page where stored content appears
+  displayUrl?: string; // page where stored content appears
   formFields?: Record<string, string>; // prefilled form fields
   /** Metadata for ML training data collection */
-  context?: string;             // dominant context label
-  waf?: string;                 // detected WAF type
-  allowedChars?: string[];      // allowed special characters
+  context?: string; // dominant context label
+  waf?: string; // detected WAF type
+  allowedChars?: string[]; // allowed special characters
 }
 
 export interface FuzzResult {

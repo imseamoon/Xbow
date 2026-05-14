@@ -45,11 +45,7 @@ describe('url.utils', () => {
     });
 
     it('overwrites existing param', () => {
-      const result = buildUrlWithParam(
-        'https://example.com?q=old',
-        'q',
-        'new',
-      );
+      const result = buildUrlWithParam('https://example.com?q=old', 'q', 'new');
       expect(result).toContain('q=new');
       expect(result).not.toContain('q=old');
     });
@@ -81,9 +77,9 @@ describe('url.utils', () => {
     });
 
     it('returns false for different domains', () => {
-      expect(
-        isSameDomain('https://example.com', 'https://other.com'),
-      ).toBe(false);
+      expect(isSameDomain('https://example.com', 'https://other.com')).toBe(
+        false,
+      );
     });
 
     it('returns false for invalid urls', () => {

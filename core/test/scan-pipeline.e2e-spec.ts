@@ -237,7 +237,11 @@ describe('scan processor pipeline (integration)', () => {
     expect(fuzzerScope.isDone()).toBe(true);
 
     // crawler was called
-    expect(mockCrawler.crawl).toHaveBeenCalledWith('https://target.com', 3, 100);
+    expect(mockCrawler.crawl).toHaveBeenCalledWith(
+      'https://target.com',
+      3,
+      100,
+    );
 
     // scan ended in DONE status
     const final = await scanService.findOne(scan.id);
@@ -305,7 +309,9 @@ describe('scan processor pipeline (integration)', () => {
     const scan = await scanService.create({ url: 'https://fail-test.com' });
     setupCrawlResult();
 
-    nock(CONTEXT_URL).post('/analyze').reply(500, { detail: 'ai model crashed' });
+    nock(CONTEXT_URL)
+      .post('/analyze')
+      .reply(500, { detail: 'ai model crashed' });
 
     await expect(processor.process(createMockJob(scan.id))).rejects.toThrow();
 
@@ -353,23 +359,25 @@ describe('scan processor pipeline (integration)', () => {
     setupContextMock();
     setupPayloadGenMock();
 
-    nock(FUZZER_URL).post('/test').reply(200, {
-      results: [
-        {
-          payload: '<script>alert(1)</script>',
-          target_param: 'q',
-          reflected: false,
-          executed: false,
-          vuln: false,
-          type: 'reflected_xss',
-          evidence: {
-            response_code: 200,
-            reflection_position: '',
-            browser_alert_triggered: false,
+    nock(FUZZER_URL)
+      .post('/test')
+      .reply(200, {
+        results: [
+          {
+            payload: '<script>alert(1)</script>',
+            target_param: 'q',
+            reflected: false,
+            executed: false,
+            vuln: false,
+            type: 'reflected_xss',
+            evidence: {
+              response_code: 200,
+              reflection_position: '',
+              browser_alert_triggered: false,
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
 
     await processor.process(createMockJob(scan.id));
 

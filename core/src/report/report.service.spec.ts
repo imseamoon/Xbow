@@ -61,7 +61,11 @@ describe('ReportService', () => {
       };
       // exec=3 + share=3 + sink=1 + payload(alert)=1 = 8 → CRITICAL
       // But no override pushes it down, so CRITICAL
-      const severity = service.buildVuln('s1', 'https://t.com', result).severity;
+      const severity = service.buildVuln(
+        's1',
+        'https://t.com',
+        result,
+      ).severity;
       expect([VulnSeverity.CRITICAL, VulnSeverity.HIGH]).toContain(severity);
     });
 
@@ -80,8 +84,9 @@ describe('ReportService', () => {
         },
       };
       // exec=2 + share=3 + sink=1 + payload=0 = 6 → HIGH
-      expect(service.buildVuln('s1', 'https://t.com', result).severity)
-        .toBe(VulnSeverity.HIGH);
+      expect(service.buildVuln('s1', 'https://t.com', result).severity).toBe(
+        VulnSeverity.HIGH,
+      );
     });
   });
 
@@ -105,7 +110,15 @@ describe('ReportService', () => {
       url: 'https://target.com',
       status: ScanStatus.DONE,
       progress: 100,
-      options: { depth: 3, maxParams: 100, verifyExecution: true, wafBypass: true, maxPayloadsPerParam: 50, timeout: 60000, reportFormat: ['json'] as ('html' | 'json' | 'pdf')[] },
+      options: {
+        depth: 3,
+        maxParams: 100,
+        verifyExecution: true,
+        wafBypass: true,
+        maxPayloadsPerParam: 50,
+        timeout: 60000,
+        reportFormat: ['json'] as ('html' | 'json' | 'pdf')[],
+      },
       createdAt: new Date('2025-01-01'),
       updatedAt: new Date('2025-01-01'),
       completedAt: new Date('2025-01-01T00:05:00'),
@@ -121,7 +134,11 @@ describe('ReportService', () => {
         severity: VulnSeverity.HIGH,
         reflected: true,
         executed: true,
-        evidence: { responseCode: 200, reflectionPosition: 'body', browserAlertTriggered: true },
+        evidence: {
+          responseCode: 200,
+          reflectionPosition: 'body',
+          browserAlertTriggered: true,
+        },
         discoveredAt: new Date('2025-01-01T00:03:00'),
       },
     ];
@@ -141,7 +158,9 @@ describe('ReportService', () => {
       expect(report.summary.totalVulns).toBe(1);
       expect(report.summary.high).toBe(1);
       expect(report.vulnerabilities).toHaveLength(1);
-      expect(report.vulnerabilities[0].payload).toBe('<script>alert(1)</script>');
+      expect(report.vulnerabilities[0].payload).toBe(
+        '<script>alert(1)</script>',
+      );
     });
   });
 });

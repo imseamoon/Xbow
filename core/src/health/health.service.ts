@@ -76,7 +76,10 @@ export class HealthService {
     };
   }
 
-  private async ping(ep: { name: string; url: string }): Promise<ServiceHealth> {
+  private async ping(ep: {
+    name: string;
+    url: string;
+  }): Promise<ServiceHealth> {
     const start = Date.now();
     try {
       await firstValueFrom(this.http.get(ep.url, { timeout: 5000 }));

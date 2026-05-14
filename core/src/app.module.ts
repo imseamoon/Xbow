@@ -34,9 +34,9 @@ import { InitialSchema1709420400000 } from './migrations/1709420400000-InitialSc
           ...base,
           entities: [ScanEntity, VulnEntity],
           migrations: [InitialSchema1709420400000],
-          migrationsRun: true,               // auto-run pending migrations on boot
+          migrationsRun: true, // auto-run pending migrations on boot
           migrationsTableName: 'typeorm_migrations',
-          synchronize: !isProd,               // only in dev for convenience
+          synchronize: !isProd, // only in dev for convenience
           logging: !isProd,
         };
       },

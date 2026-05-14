@@ -37,7 +37,7 @@ export class ReportController {
   async getFormats(@Param('scanId') scanId: string) {
     await this.scanService.findOne(scanId);
     const formats = this.reportService.getAvailableFormats(scanId);
-    const broken  = this.reportService.getBrokenFormats(scanId);
+    const broken = this.reportService.getBrokenFormats(scanId);
     return {
       scanId,
       formats,

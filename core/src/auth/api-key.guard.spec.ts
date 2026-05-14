@@ -2,7 +2,10 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiKeyGuard } from './api-key.guard';
 
-function mockExecutionContext(path: string, headers: Record<string, string> = {}) {
+function mockExecutionContext(
+  path: string,
+  headers: Record<string, string> = {},
+) {
   return {
     switchToHttp: () => ({
       getRequest: () => ({
@@ -29,7 +32,9 @@ describe('ApiKeyGuard', () => {
     });
 
     it('allows valid x-api-key header', () => {
-      const ctx = mockExecutionContext('/scan', { 'x-api-key': 'super-secret' });
+      const ctx = mockExecutionContext('/scan', {
+        'x-api-key': 'super-secret',
+      });
       expect(guard.canActivate(ctx)).toBe(true);
     });
 

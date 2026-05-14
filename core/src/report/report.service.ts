@@ -11,7 +11,11 @@ import {
 } from '../common/interfaces/vuln.interface';
 import { FuzzResult } from '../modules-bridge/fuzzer-client.service';
 import { randomUUID as uuidv4 } from 'crypto';
-import { scoreFinding, deriveSink, deriveSource } from '../common/utils/severity-scorer';
+import {
+  scoreFinding,
+  deriveSink,
+  deriveSource,
+} from '../common/utils/severity-scorer';
 
 interface TemplateData {
   logoSrc: string;
@@ -77,11 +81,11 @@ export class ReportService implements OnModuleDestroy {
    */
   private resolveTemplatesDir(): string {
     const candidates = [
-      path.join(__dirname, 'templates'),                       // dev: src/report/templates
-      path.join(__dirname, '..', 'report', 'templates'),       // dev alt
+      path.join(__dirname, 'templates'), // dev: src/report/templates
+      path.join(__dirname, '..', 'report', 'templates'), // dev alt
       path.join(__dirname, '..', '..', 'report', 'templates'), // prod: dist/src/report/../../report/templates
       path.join(process.cwd(), 'dist', 'report', 'templates'), // prod fallback (cwd-based)
-      path.join(process.cwd(), 'src', 'report', 'templates'),  // dev fallback (cwd-based)
+      path.join(process.cwd(), 'src', 'report', 'templates'), // dev fallback (cwd-based)
     ];
     for (const dir of candidates) {
       if (fs.existsSync(path.join(dir, 'report.html.hbs'))) {
@@ -110,7 +114,9 @@ export class ReportService implements OnModuleDestroy {
       }
     }
 
-    this.logger.warn('logo.png not found; reports will render without logo image');
+    this.logger.warn(
+      'logo.png not found; reports will render without logo image',
+    );
     return '';
   }
 
@@ -162,9 +168,15 @@ export class ReportService implements OnModuleDestroy {
         exactMatch: result.evidence.exact_match ?? false,
         sink,
         source,
-        ...(result.evidence.line !== undefined && { line: result.evidence.line }),
-        ...(result.evidence.snippet !== undefined && { snippet: result.evidence.snippet }),
-        ...(result.evidence.script_url !== undefined && { scriptUrl: result.evidence.script_url }),
+        ...(result.evidence.line !== undefined && {
+          line: result.evidence.line,
+        }),
+        ...(result.evidence.snippet !== undefined && {
+          snippet: result.evidence.snippet,
+        }),
+        ...(result.evidence.script_url !== undefined && {
+          scriptUrl: result.evidence.script_url,
+        }),
       },
       discoveredAt: new Date(),
     };
@@ -303,7 +315,11 @@ export class ReportService implements OnModuleDestroy {
         discoveredAt: v.discoveredAt.toISOString(),
       })),
     };
-    fs.writeFileSync(`${reportBase}.json`, JSON.stringify(report, null, 2), 'utf-8');
+    fs.writeFileSync(
+      `${reportBase}.json`,
+      JSON.stringify(report, null, 2),
+      'utf-8',
+    );
   }
 
   private generateHtml(reportBase: string, data: TemplateData): void {
@@ -383,17 +399,19 @@ export class ReportService implements OnModuleDestroy {
 <p style="color:gray;font-size:0.8em;">Generated {{generatedAt}} — template fallback (report.html.hbs not found at ${htmlPath})</p>
 </body></html>`,
       );
-      this.logger.warn(`html template not found at ${htmlPath} — using inline fallback`);
+      this.logger.warn(
+        `html template not found at ${htmlPath} — using inline fallback`,
+      );
     }
 
     if (fs.existsSync(pdfPath)) {
-      this.pdfTemplate = Handlebars.compile(
-        fs.readFileSync(pdfPath, 'utf-8'),
-      );
+      this.pdfTemplate = Handlebars.compile(fs.readFileSync(pdfPath, 'utf-8'));
       this.logger.log(`pdf template loaded from ${pdfPath}`);
     } else {
       this.pdfTemplate = this.htmlTemplate;
-      this.logger.warn(`pdf template not found at ${pdfPath}, sharing html template`);
+      this.logger.warn(
+        `pdf template not found at ${pdfPath}, sharing html template`,
+      );
     }
   }
 
@@ -511,11 +529,11 @@ export class ReportService implements OnModuleDestroy {
       case VulnType.REFLECTED_XSS:
         return 'The website takes input from the URL and displays it back on the page without cleaning it. An attacker can craft a malicious link that, when clicked by a user, runs harmful code in their browser.';
       case VulnType.STORED_XSS:
-        return 'Malicious input submitted to the website gets saved (e.g. in a database) and later displayed to other users. Every visitor who views the affected page runs the attacker\'s code automatically.';
+        return "Malicious input submitted to the website gets saved (e.g. in a database) and later displayed to other users. Every visitor who views the affected page runs the attacker's code automatically.";
       case VulnType.DOM_XSS:
-        return 'The page\'s JavaScript code reads data from the URL or user input and inserts it into the page unsafely. This allows an attacker to inject code that runs in the visitor\'s browser.';
+        return "The page's JavaScript code reads data from the URL or user input and inserts it into the page unsafely. This allows an attacker to inject code that runs in the visitor's browser.";
       case VulnType.MUTATION_XSS:
-        return 'The website attempts to sanitize user input, but the browser\'s HTML parser re-interprets the content differently. This allows an attacker to bypass the sanitizer using browser-specific parsing tricks (e.g., nested contexts in SVG/MathML).';
+        return "The website attempts to sanitize user input, but the browser's HTML parser re-interprets the content differently. This allows an attacker to bypass the sanitizer using browser-specific parsing tricks (e.g., nested contexts in SVG/MathML).";
       case VulnType.BLIND_XSS:
         return 'Malicious input is stored on the server but never displayed to the attacker. Instead, it may appear in admin panels, logs, or notification emails viewed by other users. The attacker cannot directly verify execution but the payload still reaches the target.';
       case VulnType.TEMPLATE_INJECTION:
@@ -590,7 +608,7 @@ export class ReportService implements OnModuleDestroy {
       case VulnType.BLIND_XSS:
         fixes.push(
           'Sanitize and encode all user input at the point of storage.',
-          'Never trust data from user forms, even if it doesn\'t appear on the user-facing page.',
+          "Never trust data from user forms, even if it doesn't appear on the user-facing page.",
           'Secure admin panels and backend logs — these are common Blind XSS targets.',
           'Use alerting/monitoring for suspicious payload patterns in logs.',
         );
