@@ -48,7 +48,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
             {scans.map((scan) => (
               <motion.tr
                 layout
-                initial={{ opacity: 0, y: -10, backgroundColor: "rgba(59, 130, 246, 0.05)" }}
+                initial={{ opacity: 0, y: -10, backgroundColor: "rgba(236, 72, 153, 0.05)" }}
                 animate={{ opacity: 1, y: 0, backgroundColor: "rgba(0, 0, 0, 0)" }}
                 exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
                 transition={{ duration: 0.3 }}
@@ -58,7 +58,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="size-8 rounded-md bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-blue-500 uppercase">{new URL(scan.url).hostname.substring(0,2)}</span>
+                      <span className="text-[10px] font-bold text-pink-500 uppercase">{new URL(scan.url).hostname.substring(0,2)}</span>
                     </div>
                     <span className="font-mono text-sm text-slate-300 truncate max-w-[200px] lg:max-w-[300px]">
                       {scan.url}
@@ -77,17 +77,17 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-medium text-slate-500">
                         <span className="flex items-center gap-2">
-                          <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+                          <span className="size-1.5 rounded-full bg-pink-500 animate-pulse" />
                           {scan.phase || "Probing"}
                         </span>
-                        <span className="text-blue-500">{Math.round(scan.progress)}%</span>
+                        <span className="text-pink-500">{Math.round(scan.progress)}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${scan.progress}%` }}
                           transition={{ duration: 0.5, ease: "easeOut" }}
-                          className="h-full bg-blue-500"
+                          className="h-full bg-pink-500"
                         />
                       </div>
                     </div>
@@ -124,7 +124,7 @@ export function ScanTable({ scans, onDelete }: { scans: Scan[]; onDelete?: (id: 
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Link
                       href={`/scan/${scan.id}`}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                      className="p-1.5 rounded-md text-slate-400 hover:text-pink-400 hover:bg-pink-500/10 transition-colors"
                     >
                       <ExternalLink size={16} />
                     </Link>

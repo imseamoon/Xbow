@@ -8,7 +8,7 @@ import { ScanStatus } from "@/lib/types";
 import { NewScanForm } from "@/components/new-scan-form";
 import { ScanTable } from "@/components/scan-table";
 import { useScanSocket } from "@/hooks/use-scan-socket";
-import { Activity, Plus, Server, ShieldCheck, Bug, Zap, LayoutGrid } from "lucide-react";
+import { Plus, Server, ShieldCheck, Bug, LayoutGrid } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardPage() {
@@ -105,7 +105,7 @@ export default function DashboardPage() {
           className="flex flex-col items-center gap-4"
         >
           <div className="relative size-8 flex items-center justify-center">
-            <div className="absolute inset-0 border-2 border-blue-500 rounded-full animate-spin border-t-transparent" />
+            <div className="absolute inset-0 border-2 border-pink-500 rounded-full animate-spin border-t-transparent" />
           </div>
           <span className="text-sm font-medium text-slate-400">
             Loading data...
@@ -126,7 +126,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-            <LayoutGrid size={24} className="text-blue-500" />
+            <LayoutGrid size={24} className="text-pink-500" />
             Dashboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -136,7 +136,7 @@ export default function DashboardPage() {
         
         <button
           onClick={() => setIsDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 active:bg-blue-700"
+          className="flex items-center gap-2 rounded-md bg-pink-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-pink-500 active:bg-pink-700"
         >
           <Plus size={16} />
           New Scan
@@ -144,11 +144,10 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Metrics Strip ────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MiniStat label="Active Scans" value={activeScans} status="active" icon={<Server size={18} />} />
         <MiniStat label="Completed" value={completedScans} status="secure" icon={<ShieldCheck size={18} />} />
         <MiniStat label="Vulnerabilities" value={totalVulns} status="danger" icon={<Bug size={18} />} />
-        <MiniStat label="System Status" value="99.9%" status="stable" icon={<Zap size={18} />} />
       </div>
 
       {/* ── Operational Activity ───────────────────────── */}
@@ -211,10 +210,9 @@ export default function DashboardPage() {
 
 function MiniStat({ label, value, status, icon }: { label: string; value: string | number; status: string; icon?: React.ReactNode }) {
   const styles = {
-    active: { bg: "bg-blue-500/10", text: "text-blue-500", border: "border-white/5" },
+    active: { bg: "bg-pink-500/10", text: "text-pink-500", border: "border-white/5" },
     secure: { bg: "bg-emerald-500/10", text: "text-emerald-500", border: "border-white/5" },
     danger: { bg: "bg-red-500/10", text: "text-red-500", border: "border-white/5" },
-    stable: { bg: "bg-slate-500/10", text: "text-slate-400", border: "border-white/5" },
   };
 
   const style = styles[status as keyof typeof styles];

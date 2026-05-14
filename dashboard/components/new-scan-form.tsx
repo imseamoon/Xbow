@@ -52,7 +52,7 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
             placeholder="https://example.com"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="w-full rounded-md border border-white/10 bg-[#0A0A0B] px-4 py-3 text-sm font-mono text-slate-100 placeholder-slate-600 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-white/20"
+            className="w-full rounded-md border border-white/10 bg-[#0A0A0B] px-4 py-3 text-sm font-mono text-slate-100 placeholder-slate-600 outline-none transition-colors focus:border-pink-500 focus:ring-1 focus:ring-pink-500 hover:border-white/20"
           />
         </div>
       </div>
@@ -66,15 +66,15 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
             onClick={() => setSinglePage(true)}
             className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
               singlePage
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-pink-500/50 bg-pink-500/10"
                 : "border-white/5 bg-[#0A0A0B] hover:border-white/10"
             }`}
           >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${singlePage ? "bg-blue-500/20 text-blue-400" : "bg-slate-900 text-slate-500"}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${singlePage ? "bg-pink-500/20 text-pink-400" : "bg-slate-900 text-slate-500"}`}>
               <FileSearch size={18} />
             </div>
             <div>
-              <span className={`block text-sm font-medium ${singlePage ? "text-blue-100" : "text-slate-300"}`}>Point Scan</span>
+              <span className={`block text-sm font-medium ${singlePage ? "text-pink-100" : "text-slate-300"}`}>Point Scan</span>
               <span className="text-xs text-slate-500 mt-0.5 block">Target URL Only</span>
             </div>
           </button>
@@ -84,15 +84,15 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
             onClick={() => setSinglePage(false)}
             className={`relative flex items-center gap-4 rounded-lg border p-4 text-left transition-colors ${
               !singlePage
-                ? "border-blue-500/50 bg-blue-500/10"
+                ? "border-pink-500/50 bg-pink-500/10"
                 : "border-white/5 bg-[#0A0A0B] hover:border-white/10"
             }`}
           >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${!singlePage ? "bg-blue-500/20 text-blue-400" : "bg-slate-900 text-slate-500"}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors ${!singlePage ? "bg-pink-500/20 text-pink-400" : "bg-slate-900 text-slate-500"}`}>
               <Layers size={18} />
             </div>
             <div>
-              <span className={`block text-sm font-medium ${!singlePage ? "text-blue-100" : "text-slate-300"}`}>Recursive Crawl</span>
+              <span className={`block text-sm font-medium ${!singlePage ? "text-pink-100" : "text-slate-300"}`}>Recursive Crawl</span>
               <span className="text-xs text-slate-500 mt-0.5 block">Full Network Probe</span>
             </div>
           </button>
@@ -105,7 +105,7 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
           className="flex items-center justify-between text-sm font-medium text-slate-300"
         >
           <span>Payload Density</span>
-          <span className="text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded text-xs">{maxPayloads} req/param</span>
+          <span className="text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded text-xs">{maxPayloads} req/param</span>
         </label>
         <input
           id="maxPayloads"
@@ -115,7 +115,7 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
           step={5}
           value={maxPayloads}
           onChange={(e) => setMaxPayloads(Number(e.target.value))}
-          className="w-full accent-blue-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          className="w-full accent-pink-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
@@ -135,7 +135,7 @@ export function NewScanForm({ onCreated }: NewScanFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-pink-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-pink-500 active:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Crosshair size={16} className={loading ? "animate-spin" : ""} />
         {loading ? "Engaging Protocol..." : "Create Scan"}
