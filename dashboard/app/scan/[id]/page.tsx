@@ -38,7 +38,6 @@ function formatDuration(ms: number) {
 
 export default function ScanDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const scanId = params.id as string;
 
   const [scan, setScan] = useState<Scan | null>(null);
@@ -249,18 +248,7 @@ export default function ScanDetailPage() {
         />
       </div>
 
-      {/* ── scanner log ────────────────────────────── */}
-      <Card>
-        <div className="mb-4 flex items-center gap-2">
-          <ListTodo size={16} className="text-pink-500" />
-          <h2 className="text-lg font-semibold text-slate-900">
-            Scanner Log
-          </h2>
-        </div>
-        <ScannerLogViewer scanId={scanId} />
-      </Card>
-
-      {/* ── reports ─────────────────────────────────── */}
+            {/* ── reports ─────────────────────────────────── */}
       {scan.status === ScanStatus.DONE && (
         <Card>
           <div className="mb-3 flex items-center justify-between">
@@ -338,6 +326,19 @@ export default function ScanDetailPage() {
           )}
         </Card>
       )}
+
+      {/* ── scanner log ────────────────────────────── */}
+      <Card>
+        <div className="mb-4 flex items-center gap-2">
+          <ListTodo size={16} className="text-pink-500" />
+          <h2 className="text-lg font-semibold text-slate-900">
+            Scanner Log
+          </h2>
+        </div>
+        <ScannerLogViewer scanId={scanId} />
+      </Card>
+
+
 
       {/* ── vulns ───────────────────────────────────── */}
       <Card>
