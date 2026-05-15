@@ -25,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-pink-200 font-sans text-slate-900`}>
+    <html lang="en" suppressHydrationWarning={true}>
+      <body suppressHydrationWarning={true} className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-pink-200 font-sans text-slate-900`}>
         <AuthProvider>
           <div className="min-h-screen bg-[#FDFCFD]">
             <NavBar />

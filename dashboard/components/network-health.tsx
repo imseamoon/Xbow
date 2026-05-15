@@ -19,8 +19,13 @@ export function NetworkHealth() {
     );
   }
 
-  const healthyCount = data.services.filter((service) => service.status === "up").length;
-  const downCount = data.services.filter((service) => service.status === "down").length;
+  // Defensive defaults: sometimes `data` or `data.services` can be undefined
+  const services = data?.services ?? [];
+  const healthyCount = services.filter((service) => service.status === "up").length;
+  const downCount = services.filter((service) => service.status === "down").length;
+  const statusLabel = (data?.status as HealthReport["status"]) ?? ("unknown" as HealthReport["status"]);
+  const uptime = data?.uptime ?? 0;
+  const timestamp = data?.timestamp ?? Date.now();
 
   return (
     <div className="space-y-8">
@@ -35,16 +40,16 @@ export function NetworkHealth() {
           </p>
         </div>
 
-        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${statusStyles[data.status]}`}>
+        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${statusStyles[statusLabel] ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
           <HeartPulse size={14} />
-          {data.status}
+          {statusLabel}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Metric label="Services up" value={healthyCount} icon={<ShieldCheck size={16} />} tone="emerald" />
         <Metric label="Services down" value={downCount} icon={<ServerCrash size={16} />} tone="red" />
-        <Metric label="Uptime" value={formatUptime(data.uptime)} icon={<Activity size={16} />} tone="slate" />
+        <Metric label="Uptime" value={formatUptime(uptime)} icon={<Activity size={16} />} tone="slate" />
       </div>
 
       <Card className="space-y-4">
@@ -52,16 +57,16 @@ export function NetworkHealth() {
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Service status</h2>
             <p className="text-sm text-slate-500">
-              Last checked {new Date(data.timestamp).toLocaleString()}
+              Last checked {new Date(timestamp).toLocaleString()}
             </p>
           </div>
           <span className="text-xs font-medium text-slate-400">
-            {data.services.length} services
+            {services.length} services
           </span>
         </div>
 
         <div className="space-y-3">
-          {data.services.map((service) => (
+          {services.map((service) => (
             <div key={service.name} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="flex items-center gap-2">
