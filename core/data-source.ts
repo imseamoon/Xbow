@@ -1,22 +1,15 @@
-/**
- * Standalone TypeORM DataSource — used ONLY by the typeorm CLI
- * for generating and running migrations.
- *
- * Usage:
- *   npx typeorm migration:run    -d dist/data-source.js
- *   npx typeorm migration:revert -d dist/data-source.js
- *
- * The app itself uses TypeOrmModule.forRootAsync() in AppModule,
- * which reads the same env vars but is configured separately.
- */
+import 'dotenv/config';
 import { DataSource } from 'typeorm';
+
 import { ScanEntity } from './src/scan/entities/scan.entity';
 import { VulnEntity } from './src/scan/entities/vuln.entity';
+import { UserEntity } from './src/userauth/user.entity';
 
 const url = process.env.DATABASE_URL;
 
 export default new DataSource({
   type: 'postgres',
+
   ...(url
     ? { url }
     : {
@@ -26,8 +19,18 @@ export default new DataSource({
         password: process.env.DB_PASS ?? 'rs',
         database: process.env.DB_NAME ?? 'redsentinel',
       }),
-  entities: [ScanEntity, VulnEntity],
-  migrations: ['dist/migrations/*.js'],
+
+  entities: [ScanEntity, VulnEntity, UserEntity],
+
+  migrations: [
+    process.env.NODE_ENV === 'production'
+      ? 'dist/migrations/*.js'
+      : 'src/migrations/*.ts',
+  ],
+
   migrationsTableName: 'typeorm_migrations',
+
   logging: true,
+
+  synchronize: false,
 });

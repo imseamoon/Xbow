@@ -1,3 +1,5 @@
+import type { AuthConfig } from './auth.interface';
+
 export enum ScanStatus {
   PENDING = 'PENDING',
   CRAWLING = 'CRAWLING',
@@ -11,6 +13,7 @@ export enum ScanStatus {
 }
 
 export enum ScanPhase {
+  AUTH = 'AUTH',
   CRAWL = 'CRAWL',
   CONTEXT = 'CONTEXT',
   PAYLOAD_GEN = 'PAYLOAD_GEN',
@@ -27,6 +30,7 @@ export interface ScanOptions {
   timeout?: number;
   reportFormat?: ('html' | 'json' | 'pdf')[];
   singlePage?: boolean;
+  auth?: AuthConfig;
 }
 
 export interface ScanRecord {
@@ -36,6 +40,7 @@ export interface ScanRecord {
   phase?: ScanPhase;
   progress: number;
   options: ScanOptions;
+  userId?: string;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;

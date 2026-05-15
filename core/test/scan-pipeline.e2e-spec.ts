@@ -15,12 +15,15 @@ import { ContextClientService } from '../src/modules-bridge/context-client.servi
 import { PayloadClientService } from '../src/modules-bridge/payload-client.service';
 import { FuzzerClientService } from '../src/modules-bridge/fuzzer-client.service';
 import { ReportService } from '../src/report/report.service';
+import { AuthService } from '../src/userauth/auth.service';
+import { ScannerLogService } from '../src/scanner-log/scanner-log.service';
 import { ScanStatus, ScanPhase } from '../src/common/interfaces/scan.interface';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScanEntity } from '../src/scan/entities/scan.entity';
 import { VulnEntity } from '../src/scan/entities/vuln.entity';
+import { ScanAuditEntity } from '../src/scan/entities/scan-audit.entity';
 
 describe('scan processor pipeline (integration)', () => {
   let processor: ScanProcessor;
@@ -48,6 +51,11 @@ describe('scan processor pipeline (integration)', () => {
     emitError: jest.fn(),
   };
 
+  const mockScannerLog = {
+    append: jest.fn(),
+    flush: jest.fn(),
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
@@ -64,10 +72,10 @@ describe('scan processor pipeline (integration)', () => {
         TypeOrmModule.forRoot({
           type: 'better-sqlite3',
           database: ':memory:',
-          entities: [ScanEntity, VulnEntity],
+          entities: [ScanEntity, VulnEntity, ScanAuditEntity],
           synchronize: true,
         }),
-        TypeOrmModule.forFeature([ScanEntity, VulnEntity]),
+        TypeOrmModule.forFeature([ScanEntity, VulnEntity, ScanAuditEntity]),
         HttpModule,
       ],
       providers: [
@@ -78,6 +86,7 @@ describe('scan processor pipeline (integration)', () => {
         { provide: CrawlerService, useValue: mockCrawler },
         { provide: ReportService, useValue: mockReportService },
         { provide: ScanGateway, useValue: mockGateway },
+        { provide: ScannerLogService, useValue: mockScannerLog },
       ],
     }).compile();
 
@@ -86,6 +95,12 @@ describe('scan processor pipeline (integration)', () => {
 
     // manually create the processor — it extends WorkerHost which needs
     // bullmq runtime, so we construct it directly
+    const mockAuthService = {
+      login: jest.fn(),
+      buildAuthHeaders: jest.fn(),
+      createAuthenticatedContext: jest.fn(),
+    } as unknown as AuthService;
+
     processor = new ScanProcessor(
       scanService,
       gateway as unknown as ScanGateway,
@@ -94,6 +109,8 @@ describe('scan processor pipeline (integration)', () => {
       moduleFixture.get(PayloadClientService),
       moduleFixture.get(FuzzerClientService),
       mockReportService as unknown as ReportService,
+      mockAuthService,
+      mockScannerLog as unknown as ScannerLogService,
     );
   });
 
@@ -241,6 +258,7 @@ describe('scan processor pipeline (integration)', () => {
       'https://target.com',
       3,
       100,
+      undefined,
     );
 
     // scan ended in DONE status
@@ -261,6 +279,7 @@ describe('scan processor pipeline (integration)', () => {
       expect.objectContaining({ url: 'https://target.com' }),
       vulns,
       ['html', 'json'],
+      expect.anything(),
     );
 
     // websocket events were emitted

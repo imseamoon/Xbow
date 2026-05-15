@@ -17,6 +17,7 @@ import {
 import { normalizeUrl } from '../common/utils/url.utils';
 import { ScanEntity } from './entities/scan.entity';
 import { VulnEntity } from './entities/vuln.entity';
+import { ScanAuditEntity } from './entities/scan-audit.entity';
 
 @Injectable()
 export class ScanService {
@@ -37,9 +38,11 @@ export class ScanService {
     private readonly scanRepo: Repository<ScanEntity>,
     @InjectRepository(VulnEntity)
     private readonly vulnRepo: Repository<VulnEntity>,
+    @InjectRepository(ScanAuditEntity)
+    private readonly auditRepo: Repository<ScanAuditEntity>,
   ) {}
 
-  async create(dto: CreateScanDto): Promise<ScanRecord> {
+  async create(dto: CreateScanDto, userId?: string): Promise<ScanRecord> {
     const id = uuidv4();
     const now = new Date();
     const entity = this.scanRepo.create({
@@ -47,6 +50,7 @@ export class ScanService {
       url: normalizeUrl(dto.url),
       status: ScanStatus.PENDING,
       progress: 0,
+      userId,
       options: {
         depth: dto.options?.depth ?? 3,
         maxParams: dto.options?.maxParams ?? 100,
@@ -55,31 +59,39 @@ export class ScanService {
         maxPayloadsPerParam: dto.options?.maxPayloadsPerParam ?? 50,
         timeout: dto.options?.timeout ?? 60000,
         reportFormat: dto.options?.reportFormat ?? ['html', 'json'],
+        auth: dto.options?.auth ?? undefined,
       },
       createdAt: now,
       updatedAt: now,
     });
     const saved = await this.scanRepo.save(entity);
     this.vulnKeys.set(id, new Map());
-    this.logger.log(`scan created id=${id} url=${saved.url}`);
+    this.logger.log(`scan created id=${id} url=${saved.url} userId=${userId ?? 'anonymous'}`);
     return this.toRecord(saved);
   }
 
-  async findOne(id: string): Promise<ScanRecord> {
-    const scan = await this.scanRepo.findOneBy({ id });
+  async findOne(id: string, userId?: string): Promise<ScanRecord> {
+    if (userId) {
+      const scan = await this.scanRepo.findOneBy({ id, userId } as any);
+      if (scan) return this.toRecord(scan);
+    }
+    const scan = await this.scanRepo.findOneBy({ id } as any);
     if (!scan) throw new ScanNotFoundException(id);
     return this.toRecord(scan);
   }
 
-  async findAll(): Promise<ScanRecord[]> {
+  async findAll(userId?: string): Promise<ScanRecord[]> {
+    const where: Record<string, unknown> = {};
+    if (userId) where.userId = userId;
     const scans = await this.scanRepo.find({
+      where: where as any,
       order: { createdAt: 'DESC' },
     });
     return scans.map((s) => this.toRecord(s));
   }
 
   async getVulns(id: string): Promise<Vuln[]> {
-    await this.findOne(id); // throws if not found
+    await this.findOne(id);
     const entities = await this.vulnRepo.find({
       where: { scanId: id },
       order: { discoveredAt: 'ASC' },
@@ -109,7 +121,8 @@ export class ScanService {
     progress?: number,
   ): Promise<ScanRecord> {
     const scan = await this.findOne(id);
-    if (status === ScanStatus.CRAWLING && !this.isIdle(scan)) {
+    // Allow re-entering CRAWLING if already crawling (e.g. after auth → crawl phase transition)
+    if (status === ScanStatus.CRAWLING && !this.isIdle(scan) && scan.status !== ScanStatus.CRAWLING) {
       throw new ScanAlreadyRunningException(id);
     }
 
@@ -187,8 +200,6 @@ export class ScanService {
 
     if (existing) {
       // Keep the best representative finding for this dedup key.
-      // This avoids reports showing weaker payloads (e.g. non-alert SVG)
-      // when a stronger, confirmed payload exists for the same source/sink.
       if (score <= existing.score) return false;
 
       await this.vulnRepo.update(
@@ -227,12 +238,44 @@ export class ScanService {
     return this.findOne(id);
   }
 
+  // ── audit log ────────────────────────────────────────────────
+
+  async addAuditLog(
+    scanId: string,
+    phase: string,
+    message: string,
+    data?: Record<string, unknown>,
+    durationMs?: number,
+  ): Promise<void> {
+    try {
+      const entity = this.auditRepo.create({
+        id: uuidv4(),
+        scanId,
+        phase,
+        step: 0,
+        message,
+        data: data ?? undefined,
+        durationMs,
+      });
+      await this.auditRepo.save(entity);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`failed to write audit log for scanId=${scanId}: ${detail}`);
+    }
+  }
+
+  async getAuditLogs(scanId: string): Promise<ScanAuditEntity[]> {
+    return this.auditRepo.find({
+      where: { scanId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
   // ── delete / clear operations ────────────────────────────────
 
   async deleteScan(id: string): Promise<void> {
     const scan = await this.scanRepo.findOneBy({ id });
     if (!scan) throw new ScanNotFoundException(id);
-    // CASCADE delete removes vulns automatically
     await this.scanRepo.remove(scan);
     this.vulnKeys.delete(id);
     this.logger.log(`scan deleted id=${id}`);
@@ -240,8 +283,6 @@ export class ScanService {
 
   async deleteAllScans(): Promise<number> {
     const count = await this.scanRepo.count();
-    // deleteAll() uses QueryBuilder DELETE with no WHERE — safe full-table wipe
-    // that respects FK order (vulns first, then scans).
     await this.vulnRepo.deleteAll();
     await this.scanRepo.deleteAll();
     this.vulnKeys.clear();
@@ -259,6 +300,7 @@ export class ScanService {
       phase: e.phase,
       progress: e.progress,
       options: e.options,
+      userId: e.userId ?? undefined,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
       completedAt: e.completedAt ?? undefined,

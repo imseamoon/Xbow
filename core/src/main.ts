@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import * as path from 'path';
 import { AppModule } from './app.module';
 
@@ -11,7 +12,11 @@ async function bootstrap() {
 
   // security
   app.use(helmet());
-  app.enableCors({ origin: process.env.CORS_ORIGIN ?? '*' });
+  app.use(cookieParser());
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN ?? '*',
+    credentials: true,
+  });
 
   // static reports directory
   app.useStaticAssets(path.join(process.cwd(), 'reports'), {
@@ -26,7 +31,7 @@ async function bootstrap() {
     .setTitle('RedSentinel API')
     .setDescription('AI-powered XSS scanner')
     .setVersion('2.0')
-    .addApiKey({ type: 'apiKey', in: 'header', name: 'x-api-key' }, 'x-api-key')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, doc);
   SwaggerModule.setup('docs', app, document);

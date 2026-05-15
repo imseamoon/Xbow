@@ -19,6 +19,8 @@ import { ApiKeyGuard } from '../src/auth/api-key.guard';
 import { ScanStatus } from '../src/common/interfaces/scan.interface';
 import { ScanEntity } from '../src/scan/entities/scan.entity';
 import { VulnEntity } from '../src/scan/entities/vuln.entity';
+import { ScanAuditEntity } from '../src/scan/entities/scan-audit.entity';
+import { JwtAuthGuard } from '../src/userauth/jwt-auth.guard';
 
 describe('scan lifecycle (integration)', () => {
   let app: INestApplication<App>;
@@ -37,10 +39,10 @@ describe('scan lifecycle (integration)', () => {
         TypeOrmModule.forRoot({
           type: 'better-sqlite3',
           database: ':memory:',
-          entities: [ScanEntity, VulnEntity],
+          entities: [ScanEntity, VulnEntity, ScanAuditEntity],
           synchronize: true,
         }),
-        TypeOrmModule.forFeature([ScanEntity, VulnEntity]),
+        TypeOrmModule.forFeature([ScanEntity, VulnEntity, ScanAuditEntity]),
       ],
       controllers: [ScanController],
       providers: [
@@ -56,6 +58,7 @@ describe('scan lifecycle (integration)', () => {
             emitError: jest.fn(),
           },
         },
+        { provide: JwtAuthGuard, useValue: { canActivate: jest.fn().mockReturnValue(true) } },
       ],
     }).compile();
 

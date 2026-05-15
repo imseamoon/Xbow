@@ -3,11 +3,13 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { ScanPhase } from '../common/interfaces/scan.interface';
 import { Vuln } from '../common/interfaces/vuln.interface';
+import { WsAuthMiddleware, AuthenticatedSocket } from '../userauth/ws-auth.middleware';
 
 export interface ProgressPayload {
   scanId: string;
@@ -36,14 +38,24 @@ export interface CompletePayload {
   cors: { origin: '*' },
   namespace: '/',
 })
-export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
   private readonly logger = new Logger(ScanGateway.name);
 
+  constructor(private readonly wsAuth: WsAuthMiddleware) {}
+
+  afterInit(server: Server) {
+    server.use(this.wsAuth.create());
+    this.logger.log('WebSocket auth middleware registered');
+  }
+
   handleConnection(client: Socket) {
-    this.logger.log(`client connected: ${client.id}`);
+    const authed = (client as AuthenticatedSocket).user
+      ? `user=${(client as AuthenticatedSocket).user!.email}`
+      : 'unauthenticated';
+    this.logger.log(`client connected: ${client.id} (${authed})`);
   }
 
   handleDisconnect(client: Socket) {

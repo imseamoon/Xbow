@@ -5,9 +5,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScanModule } from './scan/scan.module';
 import { ReportModule } from './report/report.module';
 import { HealthModule } from './health/health.module';
+import { UserAuthModule } from './userauth/userauth.module';
+import { ScannerLogModule } from './scanner-log/scanner-log.module';
 import { ScanEntity } from './scan/entities/scan.entity';
 import { VulnEntity } from './scan/entities/vuln.entity';
+import { UserEntity } from './userauth/user.entity';
+import { ScanAuditEntity } from './scan/entities/scan-audit.entity';
 import { InitialSchema1709420400000 } from './migrations/1709420400000-InitialSchema';
+import { AddUsersAndApiKeys1710000000000 } from './migrations/1710000000000-AddUsersAndApiKeys';
+import { AddScanUserIdAndAuditLog1720000000000 } from './migrations/1720000000000-AddScanUserIdAndAuditLog';
+import { BackfillScanOwner1730000000000 } from './migrations/1730000000000-BackfillScanOwner';
 
 @Module({
   imports: [
@@ -32,15 +39,22 @@ import { InitialSchema1709420400000 } from './migrations/1709420400000-InitialSc
         return {
           type: 'postgres' as const,
           ...base,
-          entities: [ScanEntity, VulnEntity],
-          migrations: [InitialSchema1709420400000],
-          migrationsRun: true, // auto-run pending migrations on boot
+          entities: [ScanEntity, VulnEntity, UserEntity, ScanAuditEntity],
+          migrations: [
+            InitialSchema1709420400000,
+            AddUsersAndApiKeys1710000000000,
+            AddScanUserIdAndAuditLog1720000000000,
+            BackfillScanOwner1730000000000,
+          ],
+          migrationsRun: true,
           migrationsTableName: 'typeorm_migrations',
-          synchronize: !isProd, // only in dev for convenience
+          synchronize: !isProd,
           logging: !isProd,
         };
       },
     }),
+    UserAuthModule,
+    ScannerLogModule,
     ScanModule,
     ReportModule,
     HealthModule,

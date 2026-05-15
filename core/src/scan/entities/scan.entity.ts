@@ -30,6 +30,9 @@ export class ScanEntity {
   @Column({ type: 'simple-json', default: '{}' })
   options!: ScanOptions;
 
+  @Column({ type: 'uuid', nullable: true })
+  userId?: string;
+
   @Column({ type: 'text', nullable: true })
   error?: string;
 

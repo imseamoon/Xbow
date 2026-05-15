@@ -4,20 +4,21 @@ import { ScanController } from './scan.controller';
 import { ScanService } from './scan.service';
 import { ScanGateway } from './scan.gateway';
 import { QueueModule } from '../queue/queue.module';
-import { AuthModule } from '../auth/auth.module';
+import { UserAuthModule } from '../userauth/userauth.module';
 import { CrawlerModule } from '../crawler/crawler.module';
 import { ScanEntity } from './entities/scan.entity';
 import { VulnEntity } from './entities/vuln.entity';
+import { ScanAuditEntity } from './entities/scan-audit.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ScanEntity, VulnEntity]),
+    TypeOrmModule.forFeature([ScanEntity, VulnEntity, ScanAuditEntity]),
     forwardRef(() => QueueModule),
-    AuthModule,
+    UserAuthModule,
     CrawlerModule,
   ],
   controllers: [ScanController],
   providers: [ScanService, ScanGateway],
-  exports: [ScanService, ScanGateway],
+  exports: [ScanService, ScanGateway, TypeOrmModule],
 })
 export class ScanModule {}

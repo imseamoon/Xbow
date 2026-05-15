@@ -16,6 +16,7 @@ import type {
 import { ScanStatus } from "@/lib/types";
 import { StatusBadge, ProgressBar, Card, StatCard } from "@/components/ui";
 import { VulnList } from "@/components/vuln-list";
+import { ScannerLogViewer } from "@/components/scanner-log-viewer";
 import { useScanSocket } from "@/hooks/use-scan-socket";
 import {
   ArrowLeft,
@@ -26,6 +27,7 @@ import {
   Wifi,
   Bug,
   RefreshCw,
+  ListTodo,
 } from "lucide-react";
 
 function formatDuration(ms: number) {
@@ -246,6 +248,17 @@ export default function ScanDetailPage() {
           icon={<AlertTriangle size={20} />}
         />
       </div>
+
+      {/* ── scanner log ────────────────────────────── */}
+      <Card>
+        <div className="mb-4 flex items-center gap-2">
+          <ListTodo size={16} className="text-pink-500" />
+          <h2 className="text-lg font-semibold text-slate-900">
+            Scanner Log
+          </h2>
+        </div>
+        <ScannerLogViewer scanId={scanId} />
+      </Card>
 
       {/* ── reports ─────────────────────────────────── */}
       {scan.status === ScanStatus.DONE && (

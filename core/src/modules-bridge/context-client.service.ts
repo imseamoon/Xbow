@@ -3,11 +3,14 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { PythonModuleException } from '../common/exceptions/scan.exceptions';
+import type { AuthSession } from '../common/interfaces/auth.interface';
 
 export interface AnalyzeRequest {
   url: string;
   params: string[];
   waf: string;
+  /** Optional: flat cookie header to forward to the Python context module */
+  cookieHeader?: string;
 }
 
 export type ContextMap = Record<
@@ -28,19 +31,44 @@ export class ContextClientService {
     private readonly http: HttpService,
     private readonly config: ConfigService,
   ) {
-    this.baseUrl = this.config.get<string>(
-      'CONTEXT_URL',
-      'http://localhost:5001',
-    );
+    this.baseUrl = this.config.get<string>('CONTEXT_URL', 'http://localhost:5001');
   }
 
-  async analyze(req: AnalyzeRequest): Promise<ContextMap> {
+  /**
+   * Analyse reflection contexts for the given URL/params.
+   * When `authSession` is provided the session cookies are forwarded to the
+   * Python context module so it can probe authenticated endpoints.
+   */
+  async analyze(req: AnalyzeRequest, authSession?: AuthSession): Promise<ContextMap> {
     try {
+      const payload: Record<string, unknown> = {
+        url: req.url,
+        params: req.params,
+        waf: req.waf,
+      };
+
+      // Forward cookies so the Python module can probe auth-gated endpoints
+      const cookieHeader = req.cookieHeader ?? authSession?.cookieHeader;
+      if (cookieHeader) {
+        payload.cookie_header = cookieHeader;
+        this.logger.debug(`context analyze forwarding auth cookies for ${req.url}`);
+      }
+
+      // The Python FastAPI /analyze endpoint returns AnalyzeResponse:
+      //   { results: { param: { reflects_in, allowed_chars, context_confidence } },
+      //     engine_version: "1.0.0",
+      //     waf: "..." }
+      // We MUST unwrap data.results to get the ContextMap.
       const { data } = await firstValueFrom(
-        this.http.post<ContextMap>(`${this.baseUrl}/analyze`, req),
+        this.http.post<{ results: ContextMap }>(`${this.baseUrl}/analyze`, payload),
       );
-      this.logger.log(`context module responded for ${req.url}`);
-      return data;
+      const contextMap: ContextMap = data.results ?? {};
+      if (!contextMap || Object.keys(contextMap).length === 0) {
+        this.logger.warn(`context module returned empty results for ${req.url}`);
+      } else {
+        this.logger.log(`context module responded for ${req.url}: ${Object.keys(contextMap).length} params`);
+      }
+      return contextMap;
     } catch (err) {
       let detail = 'unknown';
       if (err instanceof Error) {
@@ -51,9 +79,7 @@ export class ContextClientService {
           const data = (response as Record<string, unknown>)?.data;
           if (typeof data === 'object' && data !== null) {
             const detailValue = (data as Record<string, unknown>)?.detail;
-            if (typeof detailValue === 'string') {
-              detail = detailValue;
-            }
+            if (typeof detailValue === 'string') detail = detailValue;
           }
         }
       }

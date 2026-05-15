@@ -187,6 +187,15 @@ export class ReportService implements OnModuleDestroy {
     scan: ScanRecord,
     vulns: Vuln[],
     formats: string[],
+    auditData?: {
+      auditLogs?: Array<{ phase: string; message: string; data?: Record<string, unknown>; durationMs?: number; createdAt: Date }>;
+      crawledUrls?: string[];
+      formsFound?: Array<{ action: string; method: string; fields: string[]; sourceUrl?: string }>;
+      wafDetected?: string;
+      totalPayloadsGenerated?: number;
+      payloadsByUrl?: Record<string, { params: string[]; payloads: string[] }>;
+      injectionPoints?: Array<{ url: string; param: string; method: string }>;
+    },
   ): Promise<string> {
     const reportBase = path.join(this.reportsDir, scanId);
     const data = this.buildTemplateData(scan, vulns);
@@ -195,7 +204,7 @@ export class ReportService implements OnModuleDestroy {
 
     if (formats.includes('json')) {
       try {
-        this.generateJson(reportBase, scanId, scan, vulns);
+        this.generateJson(reportBase, scanId, scan, vulns, auditData);
         generated.push('json');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -282,6 +291,15 @@ export class ReportService implements OnModuleDestroy {
     scanId: string,
     scan: ScanRecord,
     vulns: Vuln[],
+    auditData?: {
+      auditLogs?: Array<{ phase: string; message: string; data?: Record<string, unknown>; durationMs?: number; createdAt: Date }>;
+      crawledUrls?: string[];
+      formsFound?: Array<{ action: string; method: string; fields: string[]; sourceUrl?: string }>;
+      wafDetected?: string;
+      totalPayloadsGenerated?: number;
+      payloadsByUrl?: Record<string, { params: string[]; payloads: string[] }>;
+      injectionPoints?: Array<{ url: string; param: string; method: string }>;
+    },
   ): void {
     const report = {
       meta: {
@@ -315,11 +333,38 @@ export class ReportService implements OnModuleDestroy {
         discoveredAt: v.discoveredAt.toISOString(),
       })),
     };
-    fs.writeFileSync(
-      `${reportBase}.json`,
-      JSON.stringify(report, null, 2),
-      'utf-8',
-    );
+    // ── Scan audit trail ──────────────────────────────────────────────
+    if (auditData) {
+      const audit = {
+        crawl: {
+          urlsFound: auditData.crawledUrls?.length ?? 0,
+          formsFound: auditData.formsFound?.length ?? 0,
+          wafDetected: auditData.wafDetected ?? 'none',
+          urlsScanned: auditData.crawledUrls ?? [],
+          forms: auditData.formsFound?.map((f) => ({
+            action: f.action,
+            method: f.method,
+            fields: f.fields,
+            sourceUrl: f.sourceUrl,
+          })) ?? [],
+        },
+        injection: {
+          totalPayloadsGenerated: auditData.totalPayloadsGenerated ?? 0,
+          injectionPoints: auditData.injectionPoints ?? [],
+          payloadsByUrl: auditData.payloadsByUrl ?? {},
+        },
+        timeline: auditData.auditLogs?.map((log) => ({
+          phase: log.phase,
+          message: log.message,
+          detail: log.data ?? null,
+          durationMs: log.durationMs ?? null,
+          timestamp: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
+        })) ?? [],
+      };
+      (report as Record<string, unknown>).auditTrail = audit;
+    }
+
+    fs.writeFileSync(`${reportBase}.json`, JSON.stringify(report, null, 2), 'utf-8');
   }
 
   private generateHtml(reportBase: string, data: TemplateData): void {

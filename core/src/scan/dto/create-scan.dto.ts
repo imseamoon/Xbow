@@ -7,8 +7,65 @@ import {
   IsBoolean,
   IsArray,
   IsIn,
+  IsString,
+  IsNotEmpty,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class AuthOptionsDto {
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean = false;
+
+  @ApiPropertyOptional({ example: 'https://target.com/login' })
+  @ValidateIf((o) => o.enabled)
+  @IsString()
+  @IsNotEmpty()
+  loginUrl?: string;
+
+  @ApiPropertyOptional({ example: 'admin' })
+  @ValidateIf((o) => o.enabled)
+  @IsString()
+  @IsNotEmpty()
+  username?: string;
+
+  @ApiPropertyOptional({ example: 'password' })
+  @ValidateIf((o) => o.enabled)
+  @IsString()
+  @IsNotEmpty()
+  password?: string;
+
+  @ApiPropertyOptional({ example: 'input[name="username"]' })
+  @IsOptional()
+  @IsString()
+  usernameSelector?: string;
+
+  @ApiPropertyOptional({ example: 'input[name="password"]' })
+  @IsOptional()
+  @IsString()
+  passwordSelector?: string;
+
+  @ApiPropertyOptional({ example: 'button[type="submit"]' })
+  @IsOptional()
+  @IsString()
+  submitSelector?: string;
+
+  @ApiPropertyOptional({ default: 3000 })
+  @IsOptional()
+  @IsInt()
+  @Min(500)
+  @Max(30000)
+  postLoginWaitMs?: number = 3000;
+
+  @ApiPropertyOptional({ example: '/dashboard' })
+  @IsOptional()
+  @IsString()
+  successUrlContains?: string;
+}
 
 export class ScanOptionsDto {
   @ApiPropertyOptional({ default: 3 })
@@ -64,6 +121,17 @@ export class ScanOptionsDto {
   @IsOptional()
   @IsBoolean()
   singlePage?: boolean = false;
+
+  @ApiPropertyOptional({
+    type: AuthOptionsDto,
+    description:
+      'Authentication configuration. When enabled, the scanner will ' +
+      'log in using the provided credentials before crawling and testing.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AuthOptionsDto)
+  auth?: AuthOptionsDto;
 }
 
 export class CreateScanDto {

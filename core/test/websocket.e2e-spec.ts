@@ -7,6 +7,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { io, Socket } from 'socket.io-client';
+import { WsAuthMiddleware } from '../src/userauth/ws-auth.middleware';
 import {
   ScanGateway,
   ProgressPayload,
@@ -22,8 +23,15 @@ describe('websocket events (integration)', () => {
   let port: number;
 
   beforeAll(async () => {
+    const mockWsAuth = {
+      create: jest.fn().mockReturnValue((socket: any, next: Function) => next()),
+    };
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      providers: [ScanGateway],
+      providers: [
+        ScanGateway,
+        { provide: WsAuthMiddleware, useValue: mockWsAuth },
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();

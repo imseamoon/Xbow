@@ -13,11 +13,24 @@ export enum ScanStatus {
 }
 
 export enum ScanPhase {
+  AUTH = "AUTH",
   CRAWL = "CRAWL",
   CONTEXT = "CONTEXT",
   PAYLOAD_GEN = "PAYLOAD_GEN",
   FUZZ = "FUZZ",
   REPORT = "REPORT",
+}
+
+export interface AuthConfig {
+  enabled: boolean;
+  loginUrl: string;
+  username: string;
+  password: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+  submitSelector?: string;
+  postLoginWaitMs?: number;
+  successUrlContains?: string;
 }
 
 export interface ScanOptions {
@@ -29,6 +42,7 @@ export interface ScanOptions {
   timeout?: number;
   reportFormat?: ("html" | "json" | "pdf")[];
   singlePage?: boolean;
+  auth?: AuthConfig;
 }
 
 export interface Scan {
@@ -70,8 +84,8 @@ export interface VulnEvidence {
   responseCode: number;
   reflectionPosition: string;
   browserAlertTriggered: boolean;
+  exactMatch?: boolean;
   screenshot?: string;
-  /* DOM-XSS specific fields */
   sink?: string;
   source?: string;
   line?: number;
@@ -144,7 +158,37 @@ export interface HealthReport {
 export interface ReportFormats {
   scanId: string;
   formats: string[];
-  /** Formats that exist on disk but have empty/corrupt content. */
   broken: string[];
   links: Record<string, string>;
+}
+
+/* ── user / auth types ──────────────────────────────────────── */
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt?: string;
+}
+
+/* ── audit log types ──────────────────────────────────────── */
+
+export interface AuditLogEntry {
+  id: string;
+  scanId: string;
+  phase: string;
+  step: number;
+  message: string;
+  data?: Record<string, unknown>;
+  durationMs?: number;
+  createdAt: string;
+}
+
+/* ── pagination ─────────────────────────────────────────────── */
+
+export interface PaginatedScans {
+  items: Scan[];
+  page: number;
+  limit: number;
+  total: number;
 }

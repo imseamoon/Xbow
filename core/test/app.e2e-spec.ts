@@ -8,10 +8,15 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScanController } from '../src/scan/scan.controller';
 import { ScanService } from '../src/scan/scan.service';
 import { ScanGateway } from '../src/scan/scan.gateway';
 import { ScanQueueProducer } from '../src/queue/scan.producer';
+import { ScanEntity } from '../src/scan/entities/scan.entity';
+import { VulnEntity } from '../src/scan/entities/vuln.entity';
+import { ScanAuditEntity } from '../src/scan/entities/scan-audit.entity';
+import { JwtAuthGuard } from '../src/userauth/jwt-auth.guard';
 
 const API_KEY = 'e2e-test-key';
 
@@ -25,6 +30,13 @@ describe('app e2e smoke', () => {
           isGlobal: true,
           load: [() => ({ API_KEY_SECRET: API_KEY })],
         }),
+        TypeOrmModule.forRoot({
+          type: 'better-sqlite3',
+          database: ':memory:',
+          entities: [ScanEntity, VulnEntity, ScanAuditEntity],
+          synchronize: true,
+        }),
+        TypeOrmModule.forFeature([ScanEntity, VulnEntity, ScanAuditEntity]),
       ],
       controllers: [ScanController],
       providers: [
@@ -40,6 +52,7 @@ describe('app e2e smoke', () => {
             emitError: jest.fn(),
           },
         },
+        { provide: JwtAuthGuard, useValue: { canActivate: jest.fn().mockReturnValue(true) } },
       ],
     }).compile();
 

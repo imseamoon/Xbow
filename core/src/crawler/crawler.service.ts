@@ -8,6 +8,7 @@ import {
   DiscoveredParam,
 } from '../common/interfaces/crawler.interface';
 import { isSameDomain, isAbsoluteUrl } from '../common/utils/url.utils';
+import type { AuthSession } from '../common/interfaces/auth.interface';
 
 @Injectable()
 export class CrawlerService implements OnModuleDestroy {
@@ -25,8 +26,6 @@ export class CrawlerService implements OnModuleDestroy {
   }
 
   private async getBrowser(): Promise<Browser> {
-    // If we have a cached browser but it's disconnected (crashed or closed by
-    // a previous hot-reload cycle), clear the reference so we relaunch below.
     if (this.browser && !this.browser.isConnected()) {
       this.logger.warn('browser disconnected — relaunching');
       this.browser = null;
@@ -49,10 +48,16 @@ export class CrawlerService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Crawl the target. When `authSession` is provided the browser context
+   * is pre-loaded with the saved cookies/localStorage so authenticated
+   * pages are accessible.
+   */
   async crawl(
     url: string,
     depth: number,
     maxParams: number,
+    authSession?: AuthSession,
   ): Promise<CrawlResult> {
     const startedAt = Date.now();
     const visited = new Set<string>();
@@ -60,13 +65,11 @@ export class CrawlerService implements OnModuleDestroy {
       { url, currentDepth: 0 },
     ];
     const allParams: DiscoveredParam[] = [];
-    const allForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] =
-      [];
+    const allForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] = [];
     const allScripts: string[] = [];
     const paramNames = new Set<string>();
     const formKeys = new Set<string>();
 
-    // hard caps to prevent runaway crawls on large sites
     const maxUrls = Math.max(
       this.config.get<number>('CRAWLER_MAX_URLS', 80),
       10,
@@ -75,20 +78,27 @@ export class CrawlerService implements OnModuleDestroy {
     const visitedPatterns = new Map<string, number>();
 
     const browser = await this.getBrowser();
-    const context = await browser.newContext({
+
+    // Build context options — inject saved auth state when available
+    const contextOptions: Parameters<Browser['newContext']>[0] = {
       userAgent: this.config.get<string>(
         'CRAWLER_USER_AGENT',
         'RedSentinel/1.0 (Security Scanner)',
       ),
       ignoreHTTPSErrors: true,
-    });
+    };
+
+    if (authSession?.storageState) {
+      contextOptions.storageState = authSession.storageState as any;
+      this.logger.log(
+        `crawl context loaded with ${authSession.storageState.cookies.length} auth cookies`,
+      );
+    }
+
+    const context = await browser.newContext(contextOptions);
 
     // capture waf on the first request
-    let wafResult = {
-      detected: false,
-      name: null as string | null,
-      confidence: 0,
-    };
+    let wafResult = { detected: false, name: null as string | null, confidence: 0 };
     let wafChecked = false;
 
     try {
@@ -103,9 +113,6 @@ export class CrawlerService implements OnModuleDestroy {
 
         if (visited.has(normalized)) continue;
 
-        // deduplicate URL patterns (e.g. /user/view/X — only crawl a few per pattern)
-        // Allow up to MAX_PER_PATTERN pages per pattern so different challenge
-        // pages (e.g. /missions/basic/1/ vs /missions/basic/2/) are not skipped.
         const MAX_PER_PATTERN = 5;
         const pattern = this.urlToPattern(item.url);
         const patternCount = visitedPatterns.get(pattern) ?? 0;
@@ -113,24 +120,20 @@ export class CrawlerService implements OnModuleDestroy {
         visitedPatterns.set(pattern, patternCount + 1);
 
         visited.add(normalized);
-
         this.logger.debug(`crawling: ${item.url} (depth=${item.currentDepth})`);
 
         const page = await context.newPage();
         try {
           const response = await page.goto(item.url, {
-            // domcontentloaded is fast; we wait for individual frames below.
             waitUntil: 'domcontentloaded',
             timeout: 15000,
           });
 
           if (!response) continue;
 
-          // waf detection on first response
           if (!wafChecked) {
             const headers: Record<string, string> = {};
-            const responseHeaders = response.headers();
-            for (const [k, v] of Object.entries(responseHeaders)) {
+            for (const [k, v] of Object.entries(response.headers())) {
               headers[k.toLowerCase()] = v;
             }
             const cookies = await context.cookies();
@@ -140,42 +143,41 @@ export class CrawlerService implements OnModuleDestroy {
             wafChecked = true;
           }
 
-          // Process every frame Playwright has already loaded — main frame,
-          // static iframes, dynamically injected iframes, nested iframes.
-          // This is more robust than parsing iframe[src] attributes because it
-          // works regardless of how the frame was created.
+          // Check for login redirect — if we ended up on a login page despite
+          // having auth session, log a warning but continue
+          if (authSession?.storageState) {
+            const currentUrl = page.url();
+            const isLoginPage = await this.detectLoginRedirect(page, currentUrl);
+            if (isLoginPage) {
+              this.logger.warn(
+                `possible auth redirect detected at ${currentUrl} — session may have expired`,
+              );
+            }
+          }
+
           const frames = page.frames();
           for (const frame of frames) {
             const frameUrl = frame.url();
             if (!frameUrl || frameUrl === 'about:blank') continue;
 
-            // Mark the frame's own URL visited so the crawl queue doesn't
-            // re-fetch it as a separate top-level page later.
             visited.add(this.normalizeForVisit(frameUrl));
 
-            // Wait for the frame to finish loading before reading its content.
-            // Without this, frame.content() on a slow iframe returns empty HTML.
             try {
               await frame.waitForLoadState('load', { timeout: 8000 });
             } catch {
-              // frame timed out — read whatever is available
+              // frame timed out
             }
 
             let frameHtml: string;
             try {
               frameHtml = await frame.content();
             } catch {
-              // cross-origin or detached frame — skip
               continue;
             }
 
             const effectiveUrl = frameUrl || item.url;
 
-            // extract params
-            const frameParams = this.domAnalyzer.extractParams(
-              effectiveUrl,
-              frameHtml,
-            );
+            const frameParams = this.domAnalyzer.extractParams(effectiveUrl, frameHtml);
             for (const p of frameParams) {
               if (!paramNames.has(p.name) && paramNames.size < maxParams) {
                 paramNames.add(p.name);
@@ -183,11 +185,7 @@ export class CrawlerService implements OnModuleDestroy {
               }
             }
 
-            // extract forms
-            const frameForms = this.domAnalyzer.extractForms(
-              frameHtml,
-              effectiveUrl,
-            );
+            const frameForms = this.domAnalyzer.extractForms(frameHtml, effectiveUrl);
             for (const form of frameForms) {
               const formKey = `${form.action}|${form.method}|${form.fields.sort().join(',')}`;
               if (!formKeys.has(formKey)) {
@@ -196,7 +194,6 @@ export class CrawlerService implements OnModuleDestroy {
               }
             }
 
-            // extract inline scripts for dom sink analysis
             try {
               const frameScripts = await frame.evaluate(() => {
                 const els = document.querySelectorAll('script:not([src])');
@@ -204,7 +201,6 @@ export class CrawlerService implements OnModuleDestroy {
               });
               allScripts.push(...frameScripts);
 
-              // fetch same-domain external scripts
               const externalSrcs = await frame.evaluate(() =>
                 Array.from(document.querySelectorAll('script[src]')).map(
                   (el) => el.getAttribute('src') ?? '',
@@ -214,13 +210,10 @@ export class CrawlerService implements OnModuleDestroy {
                 try {
                   const absUrl = new URL(src, effectiveUrl).toString();
                   if (isSameDomain(url, absUrl)) {
-                    const text = await frame.evaluate(
-                      async (scriptUrl: string) => {
-                        const r = await fetch(scriptUrl);
-                        return r.text();
-                      },
-                      absUrl,
-                    );
+                    const text = await frame.evaluate(async (scriptUrl: string) => {
+                      const r = await fetch(scriptUrl);
+                      return r.text();
+                    }, absUrl);
                     allScripts.push(text);
                   }
                 } catch {
@@ -228,11 +221,10 @@ export class CrawlerService implements OnModuleDestroy {
                 }
               }
             } catch {
-              // frame became detached during script extraction
+              // frame detached
             }
           }
 
-          // discover links for further crawling — collect from all same-origin frames
           if (item.currentDepth < depth) {
             for (const frame of frames) {
               const frameUrl = frame.url();
@@ -249,10 +241,7 @@ export class CrawlerService implements OnModuleDestroy {
                     isSameDomain(url, link) &&
                     !visited.has(this.normalizeForVisit(link))
                   ) {
-                    toVisit.push({
-                      url: link,
-                      currentDepth: item.currentDepth + 1,
-                    });
+                    toVisit.push({ url: link, currentDepth: item.currentDepth + 1 });
                   }
                 }
               } catch {
@@ -268,12 +257,9 @@ export class CrawlerService implements OnModuleDestroy {
         }
       }
 
-      // analyze dom sinks across all collected scripts
       const domSinks = this.domAnalyzer.scanDomSinks(allScripts);
-
-      // extract forms from last visited pages
-
       const durationMs = Date.now() - startedAt;
+
       const result: CrawlResult = {
         baseUrl: url,
         urls: Array.from(visited),
@@ -285,13 +271,33 @@ export class CrawlerService implements OnModuleDestroy {
       };
 
       this.logger.log(
-        `crawl complete: ${visited.size} urls, ${allParams.length} params, ${domSinks.length} sinks, ${durationMs}ms`,
+        `crawl complete: ${visited.size} urls, ${allParams.length} params, ` +
+        `${domSinks.length} sinks, ${durationMs}ms` +
+        (authSession ? ' [authenticated]' : ''),
       );
 
       return result;
     } finally {
       await context.close();
     }
+  }
+
+  private async detectLoginRedirect(
+    page: import('playwright').Page,
+    currentUrl: string,
+  ): Promise<boolean> {
+    const loginIndicators = ['/login', '/signin', '/auth/login', '/account/login'];
+    const urlLower = currentUrl.toLowerCase();
+    if (loginIndicators.some((ind) => urlLower.includes(ind))) return true;
+
+    try {
+      const hasPasswordField = await page.$('input[type="password"]');
+      if (hasPasswordField) return true;
+    } catch {
+      // page may have navigated
+    }
+
+    return false;
   }
 
   private normalizeForVisit(raw: string): string {
@@ -304,12 +310,6 @@ export class CrawlerService implements OnModuleDestroy {
     }
   }
 
-  /**
-   * convert a URL to a structural pattern for deduplication.
-   * replaces path segments that look like IDs/slugs with placeholders.
-   * e.g. /user/view/JohnDoe → /user/view/{slug}
-   *      /com/report/101608 → /com/report/{id}
-   */
   private urlToPattern(raw: string): string {
     try {
       const u = new URL(raw);
@@ -317,7 +317,6 @@ export class CrawlerService implements OnModuleDestroy {
         if (!seg) return seg;
         if (/^\d+$/.test(seg)) return '{id}';
         if (/^[a-f0-9-]{8,}$/i.test(seg)) return '{uuid}';
-        // treat trailing slugs (mixed case, numbers, special chars) as dynamic
         if (seg.length > 3 && /[A-Z]/.test(seg) && /[a-z]/.test(seg))
           return '{slug}';
         return seg;

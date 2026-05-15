@@ -127,3 +127,67 @@ export function StatCard({
     </div>
   );
 }
+
+/* ── Alert ─────────────────────────────────────────────────────── */
+
+export function Alert({ type, children }: { type: "error" | "success" | "warning" | "info"; children: React.ReactNode }) {
+  const map: Record<string, string> = {
+    error: "bg-red-50 border-red-200 text-red-600",
+    success: "bg-emerald-50 border-emerald-200 text-emerald-600",
+    warning: "bg-amber-50 border-amber-200 text-amber-600",
+    info: "bg-blue-50 border-blue-200 text-blue-600",
+  };
+  return (
+    <div className={`rounded-lg px-3 py-2.5 text-sm border ${map[type]}`}>
+      {children}
+    </div>
+  );
+}
+
+/* ── Spinner ─────────────────────────────────────────────────── */
+
+export function Spinner({ size = 16 }: { size?: number }) {
+  return (
+    <div
+      className="inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-slate-400"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+/* ── Button ──────────────────────────────────────────────────── */
+
+export function Button({
+  children, onClick, disabled, variant = "default", size = "md",
+  className = "", type,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: "default" | "danger" | "primary" | "ghost";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  type?: "button" | "submit" | "reset";
+}) {
+  const variants: Record<string, string> = {
+    default: "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200",
+    primary: "bg-pink-600 border-pink-600 text-white hover:bg-pink-700",
+    danger: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100",
+    ghost: "bg-transparent border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50",
+  };
+  const sizes: Record<string, string> = {
+    sm: "px-2.5 py-1 text-xs",
+    md: "px-3.5 py-2 text-sm",
+    lg: "px-5 py-2.5 text-sm",
+  };
+  return (
+    <button
+      type={type || "button"}
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}

@@ -7,6 +7,8 @@ import { ModulesBridgeModule } from '../modules-bridge/bridge.module';
 import { ReportModule } from '../report/report.module';
 import { ScanModule } from '../scan/scan.module';
 import { CrawlerModule } from '../crawler/crawler.module';
+import { UserAuthModule } from '../userauth/userauth.module';
+import { ScannerLogModule } from '../scanner-log/scanner-log.module';
 
 @Module({
   imports: [
@@ -24,7 +26,9 @@ import { CrawlerModule } from '../crawler/crawler.module';
     forwardRef(() => ScanModule),
     CrawlerModule,
     ModulesBridgeModule,
+    ScannerLogModule,
     ReportModule,
+    UserAuthModule,
   ],
   providers: [ScanQueueProducer, ScanProcessor],
   exports: [ScanQueueProducer],

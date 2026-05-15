@@ -8,9 +8,7 @@ import { PythonModuleException } from '../common/exceptions/scan.exceptions';
 
 function mockConfig(overrides: Record<string, string> = {}) {
   return {
-    get: jest.fn(
-      (key: string, fallback?: string) => overrides[key] ?? fallback,
-    ),
+    get: jest.fn((key: string, fallback?: string) => overrides[key] ?? fallback),
   } as any;
 }
 
@@ -31,46 +29,26 @@ function mockHttpError(msg: string) {
 
 describe('ContextClientService', () => {
   it('calls POST /analyze and returns context map', async () => {
-    const resp = {
-      q: {
-        reflects_in: 'html_text',
-        allowed_chars: ['<', '>'],
-        context_confidence: 0.9,
-      },
-    };
+    const resp = { q: { reflects_in: 'html_text', allowed_chars: ['<', '>'], context_confidence: 0.9 } };
     const http = mockHttp(resp);
     const svc = new ContextClientService(http, mockConfig());
-    const result = await svc.analyze({
-      url: 'https://t.com',
-      params: ['q'],
-      waf: 'none',
-    });
-    expect(http.post).toHaveBeenCalledWith(
-      'http://localhost:5001/analyze',
-      expect.anything(),
-    );
+    const result = await svc.analyze({ url: 'https://t.com', params: ['q'], waf: 'none' });
+    expect(http.post).toHaveBeenCalledWith('http://localhost:5001/analyze', expect.anything());
     expect(result.q.reflects_in).toBe('html_text');
   });
 
   it('uses configured CONTEXT_URL', async () => {
     const http = mockHttp({});
-    const svc = new ContextClientService(
-      http,
-      mockConfig({ CONTEXT_URL: 'http://ctx:9000' }),
-    );
+    const svc = new ContextClientService(http, mockConfig({ CONTEXT_URL: 'http://ctx:9000' }));
     await svc.analyze({ url: 'https://t.com', params: ['q'], waf: 'none' });
-    expect(http.post).toHaveBeenCalledWith(
-      'http://ctx:9000/analyze',
-      expect.anything(),
-    );
+    expect(http.post).toHaveBeenCalledWith('http://ctx:9000/analyze', expect.anything());
   });
 
   it('throws PythonModuleException on error', async () => {
     const http = mockHttpError('network fail');
     const svc = new ContextClientService(http, mockConfig());
-    await expect(
-      svc.analyze({ url: 'https://t.com', params: ['q'], waf: 'none' }),
-    ).rejects.toThrow(PythonModuleException);
+    await expect(svc.analyze({ url: 'https://t.com', params: ['q'], waf: 'none' }))
+      .rejects.toThrow(PythonModuleException);
   });
 });
 
@@ -78,24 +56,10 @@ describe('ContextClientService', () => {
 
 describe('PayloadClientService', () => {
   it('calls POST /generate and returns payloads', async () => {
-    const resp = {
-      payloads: [
-        {
-          payload: '<img src=x>',
-          target_param: 'q',
-          context: 'html_text',
-          confidence: 0.8,
-          waf_bypass: false,
-        },
-      ],
-    };
+    const resp = { payloads: [{ payload: '<img src=x>', target_param: 'q', context: 'html_text', confidence: 0.8, waf_bypass: false }] };
     const http = mockHttp(resp);
     const svc = new PayloadClientService(http, mockConfig());
-    const result = await svc.generate({
-      contexts: {},
-      waf: 'none',
-      maxPayloads: 10,
-    });
+    const result = await svc.generate({ contexts: {}, waf: 'none', maxPayloads: 10 });
     expect(http.post).toHaveBeenCalledWith(
       'http://localhost:5002/generate',
       expect.objectContaining({ max_payloads: 10 }),
@@ -115,9 +79,8 @@ describe('PayloadClientService', () => {
   it('throws PythonModuleException on error', async () => {
     const http = mockHttpError('timeout');
     const svc = new PayloadClientService(http, mockConfig());
-    await expect(
-      svc.generate({ contexts: {}, waf: 'none', maxPayloads: 10 }),
-    ).rejects.toThrow(PythonModuleException);
+    await expect(svc.generate({ contexts: {}, waf: 'none', maxPayloads: 10 }))
+      .rejects.toThrow(PythonModuleException);
   });
 });
 
@@ -125,27 +88,10 @@ describe('PayloadClientService', () => {
 
 describe('FuzzerClientService', () => {
   it('calls POST /test and returns results', async () => {
-    const resp = {
-      results: [
-        {
-          payload: '<script>',
-          target_param: 'q',
-          reflected: true,
-          executed: false,
-          vuln: false,
-          type: '',
-          evidence: {},
-        },
-      ],
-    };
+    const resp = { results: [{ payload: '<script>', target_param: 'q', reflected: true, executed: false, vuln: false, type: '', evidence: {} }] };
     const http = mockHttp(resp);
     const svc = new FuzzerClientService(http, mockConfig());
-    const result = await svc.test({
-      url: 'https://t.com',
-      payloads: [],
-      verifyExecution: true,
-      timeout: 5000,
-    });
+    const result = await svc.test({ url: 'https://t.com', payloads: [], verifyExecution: true, timeout: 5000 });
     expect(http.post).toHaveBeenCalledWith(
       'http://localhost:5003/test',
       expect.objectContaining({ verify_execution: true }),
@@ -156,12 +102,7 @@ describe('FuzzerClientService', () => {
   it('remaps verifyExecution to verify_execution for Python API', async () => {
     const http = mockHttp({ results: [] });
     const svc = new FuzzerClientService(http, mockConfig());
-    await svc.test({
-      url: 'https://t.com',
-      payloads: [],
-      verifyExecution: false,
-      timeout: 3000,
-    });
+    await svc.test({ url: 'https://t.com', payloads: [], verifyExecution: false, timeout: 3000 });
     const postBody = http.post.mock.calls[0][1];
     expect(postBody.verify_execution).toBe(false);
   });
@@ -169,13 +110,7 @@ describe('FuzzerClientService', () => {
   it('throws PythonModuleException on error', async () => {
     const http = mockHttpError('connection refused');
     const svc = new FuzzerClientService(http, mockConfig());
-    await expect(
-      svc.test({
-        url: 'https://t.com',
-        payloads: [],
-        verifyExecution: true,
-        timeout: 5000,
-      }),
-    ).rejects.toThrow(PythonModuleException);
+    await expect(svc.test({ url: 'https://t.com', payloads: [], verifyExecution: true, timeout: 5000 }))
+      .rejects.toThrow(PythonModuleException);
   });
 });

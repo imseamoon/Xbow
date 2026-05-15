@@ -19,11 +19,11 @@ import {
 import type { Response } from 'express';
 import { ReportService } from './report.service';
 import { ScanService } from '../scan/scan.service';
-import { ApiKeyGuard } from '../auth/api-key.guard';
+import { JwtAuthGuard } from '../userauth/jwt-auth.guard';
 
 @ApiTags('reports')
 @ApiBearerAuth()
-@UseGuards(ApiKeyGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportController {
   constructor(
@@ -37,7 +37,7 @@ export class ReportController {
   async getFormats(@Param('scanId') scanId: string) {
     await this.scanService.findOne(scanId);
     const formats = this.reportService.getAvailableFormats(scanId);
-    const broken = this.reportService.getBrokenFormats(scanId);
+    const broken  = this.reportService.getBrokenFormats(scanId);
     return {
       scanId,
       formats,
