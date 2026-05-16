@@ -109,11 +109,7 @@ export class FuzzerClientService {
         body.auth_storage_state = storageState;
       }
 
-      const { data } = await firstValueFrom(
-        this.http.post<TestResponse>(`${this.baseUrl}/test`, body, {
-          timeout: axiosTimeoutMs,
-        }),
-      );
+      const { data } = await this.postFuzzer(body, axiosTimeoutMs);
       this.logger.log(
         `fuzzer tested ${req.payloads.length} payloads → ${data.results.filter((r) => r.vuln).length} vulns`,
       );
@@ -136,5 +132,40 @@ export class FuzzerClientService {
       }
       throw new PythonModuleException('fuzzer', detail);
     }
+  }
+
+  private async postFuzzer(
+    body: Record<string, unknown>,
+    timeout: number,
+  ): Promise<{ data: TestResponse }> {
+    try {
+      return await firstValueFrom(
+        this.http.post<TestResponse>(`${this.baseUrl}/fuzz`, body, {
+          timeout,
+        }),
+      );
+    } catch (err) {
+      if (!this.isMissingRoute(err)) {
+        throw err;
+      }
+
+      this.logger.warn(
+        'fuzzer /fuzz endpoint unavailable; falling back to legacy /test',
+      );
+      return firstValueFrom(
+        this.http.post<TestResponse>(`${this.baseUrl}/test`, body, {
+          timeout,
+        }),
+      );
+    }
+  }
+
+  private isMissingRoute(err: unknown): boolean {
+    const errObj = err as Record<string, unknown>;
+    if (typeof errObj.response !== 'object' || errObj.response === null) {
+      return false;
+    }
+    const response = errObj.response as Record<string, unknown>;
+    return response.status === 404 || response.status === 405;
   }
 }

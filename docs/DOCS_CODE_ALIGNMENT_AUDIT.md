@@ -31,7 +31,7 @@ To reduce redundancy and avoid conflicting claims, each topic has one primary ho
 | API authentication wording | `README.md`, `RUN.md`, `docs/REPOSITORY_GUIDE.md` | All endpoints described as requiring `x-api-key`/API-key auth | `ScanController` and `ReportController` use `JwtAuthGuard`; `HealthController` is public | Docs overstated API-key use for scan/report routes | Updated docs to describe JWT-guarded scan/report routes and public `/health`; noted API-key components separately where wired | High |
 | Python context API | `README.md`, `docs/ARCHITECTURE.md` | Context schema could be read as wrapped response or as shared schema superset | `modules/context-module/app.py`; `modules/shared/schemas.py` | Context app has local model and returns a bare param map | Detailed schema kept in `docs/ARCHITECTURE.md`; README now links there instead of duplicating full schemas | High |
 | Python payload-gen API | `README.md`, `docs/ARCHITECTURE.md`, `docs/ML_GUIDE.md` | XGBoost/ranker behavior was too absolute or incomplete | `modules/payload-gen-module/app.py`; `modules/shared/schemas.py` | XGBoost is conditional; `/ranker/info` exists | Documented `/generate`, `/health`, `/ranker/info`, `max_payloads`, and XGBoost-with-heuristic-fallback behavior; full contract lives in `docs/ARCHITECTURE.md` | High |
-| Python fuzzer API | `README.md`, `docs/ARCHITECTURE.md` | Risk of documenting `/fuzz` or incomplete `/test` schema | `modules/fuzzer-module/app.py`; `modules/shared/schemas.py` | Implemented endpoint is `/test`; `/fuzz` is absent | Documented `/test`, `/health`, `/training/stats`; README now summarizes and links to `docs/ARCHITECTURE.md` for the full contract | High |
+| Python fuzzer API | `README.md`, `docs/ARCHITECTURE.md` | Fuzzer route naming drift between `/test` and `/fuzz` | `modules/fuzzer-module/app.py`; `modules/shared/schemas.py`; `core/src/modules-bridge/fuzzer-client.service.ts` | Canonical endpoint is `/fuzz`; `/test` remains a legacy alias | Documented `/fuzz`, `/health`, `/training/stats`; noted `/test` compatibility in `docs/ARCHITECTURE.md`; Core bridge calls `/fuzz` | High |
 | Health checks | `README.md`, `RUN.md`, `docs/ARCHITECTURE.md` | Health responses were incomplete | `core/src/health/*`, Python `app.py` files | Docs did not show actual response fields | Added Core aggregate health shape and Python service health fields where operationally useful | Medium |
 | Docker/runtime artifacts | `README.md`, `RUN.md`, `docs/ARCHITECTURE.md`, `docs/REPOSITORY_GUIDE.md`, `docs/ML_GUIDE.md`, `dataset/README.md` | Mounted artifacts/fallbacks were incomplete | `docker-compose.yml`, Python app startup code | Missing model, ranker, dataset split, reports, and training data mount details | Documented all relevant mounts and fallback behavior; README keeps a compact summary, detailed ownership lives in repository/ML/run docs | Medium |
 | Severity scoring | `docs/ARCHITECTURE.md` | Old `HASH_SOURCE_LOW_CAP`; possible impression of formal CVSS-like risk model | `core/src/common/utils/severity-scorer.ts` | Code uses rule-based scorer and caps hash source to MEDIUM | Documented rule-based axes, thresholds, overrides, and `HASH_SOURCE_MEDIUM_CAP`; explicitly excluded CVSS/ALE | High |
@@ -80,7 +80,7 @@ Repository searches were run for the requested stale/suspicious terms after docu
 - `24K`
 - `CVSS`
 - `ALE`
-- `/fuzz`
+- `/test` as canonical fuzzer route
 - `max_params`
 - `verify_execution`
 - `waf_bypass`

@@ -209,7 +209,7 @@ describe('scan processor pipeline (integration)', () => {
     ];
 
     return nock(FUZZER_URL)
-      .post('/test')
+      .post('/fuzz')
       .reply(200, { results: results.slice(0, vulnCount === 0 ? 0 : 2) });
   }
 
@@ -349,7 +349,7 @@ describe('scan processor pipeline (integration)', () => {
     setupContextMock();
     setupPayloadGenMock();
 
-    nock(FUZZER_URL).post('/test').reply(500, { detail: 'browser timeout' });
+    nock(FUZZER_URL).post('/fuzz').reply(500, { detail: 'browser timeout' });
 
     await expect(processor.process(createMockJob(scan.id))).rejects.toThrow();
 
@@ -379,7 +379,7 @@ describe('scan processor pipeline (integration)', () => {
     setupPayloadGenMock();
 
     nock(FUZZER_URL)
-      .post('/test')
+      .post('/fuzz')
       .reply(200, {
         results: [
           {

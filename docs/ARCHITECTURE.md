@@ -59,7 +59,7 @@ Dashboard (Next.js :8080) ───────► Core (NestJS :3000)
                                              │
                                              ├─ Context module :5001 /analyze
                                              ├─ Payload-gen module :5002 /generate, /ranker/info
-                                             └─ Fuzzer module :5003 /test
+                                             └─ Fuzzer module :5003 /fuzz
 ```
 
 ---
@@ -110,7 +110,7 @@ The queue processor orchestrates the scan in these phases:
 2. **CRAWL** — discover URLs, query parameters, forms, DOM signals, and WAF information. `singlePage` skips crawling and scans only the canonical submitted URL.
 3. **CONTEXT** — call the context module for each target URL/parameter set.
 4. **PAYLOAD-GEN** — call payload-gen with context data and `max_payloads` derived from `maxPayloadsPerParam`.
-5. **FUZZ** — call the fuzzer `/test` endpoint for reflected, stored, form, fragment, and DOM-oriented checks as supported by the queue logic and fuzzer implementation.
+5. **FUZZ** — call the fuzzer `/fuzz` endpoint for reflected, stored, form, fragment, and DOM-oriented checks as supported by the queue logic and fuzzer implementation.
 6. **REPORT** — score findings, persist vulnerabilities, and generate requested report formats.
 
 ---
@@ -276,9 +276,9 @@ Implemented response model:
 
 Payload ranking uses XGBoost only when the ranker model is available; otherwise it falls back to heuristic scoring.
 
-### 8.3 Fuzzer module — `POST /test`
+### 8.3 Fuzzer module — `POST /fuzz`
 
-There is no implemented `/fuzz` endpoint.
+`POST /test` is kept as a legacy compatibility alias and is hidden from the generated FastAPI schema. The Core bridge prefers `/fuzz` and falls back to `/test` only when `/fuzz` is unavailable, which allows mixed deployments during the rename.
 
 Implemented shared request model:
 

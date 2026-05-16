@@ -88,7 +88,7 @@ If a dependency is needed in both Docker and local development, update both the 
 
 - Use camelCase scan option names from `CreateScanDto`: `maxParams`, `verifyExecution`, `wafBypass`, `maxPayloadsPerParam`, and `reportFormat`.
 - Use Python schema names for microservice contracts: `max_payloads`, `verify_execution`, `stored_mode`, `display_url`, and `form_fields`.
-- Do not document `/fuzz`; the implemented fuzzer route is `/test`.
+- Document `/fuzz` as the canonical fuzzer route; `/test` is only a legacy compatibility alias.
 - Do not claim `/scan/:id/report` downloads HTML/PDF/JSON. It returns a report URL pointer only.
 - Do not claim CVSS, ALE, expected monetary loss, or formal risk calculus. Severity is rule-based.
 - Use `HASH_SOURCE_MEDIUM_CAP`, not the stale `HASH_SOURCE_LOW_CAP` name.

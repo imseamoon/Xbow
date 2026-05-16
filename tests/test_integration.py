@@ -222,7 +222,7 @@ async def test_fuzzer_accepts_payloadgen_output(
     async with AsyncClient(
         transport=ASGITransport(app=fuzzer_mod.app), base_url="http://test"
     ) as client:
-        resp = await client.post("/test", json={
+        resp = await client.post("/fuzz", json={
             "url": "https://target.com/search",
             "payloads": payloads,
             "verify_execution": False,
@@ -340,7 +340,7 @@ async def test_full_pipeline_data_flow(
     async with AsyncClient(
         transport=ASGITransport(app=fuzzer_mod.app), base_url="http://test"
     ) as client:
-        fuzz_resp = await client.post("/test", json={
+        fuzz_resp = await client.post("/fuzz", json={
             "url": "https://target.com",
             "payloads": fuzzer_payloads,
             "verify_execution": False,

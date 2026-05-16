@@ -46,7 +46,7 @@ async def test_health_endpoint():
 async def test_fuzz_empty_payloads():
     """empty payloads list should return empty results"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post("/test", json={
+        resp = await client.post("/fuzz", json={
             "url": "https://example.com",
             "payloads": [],
             "verify_execution": True,
@@ -58,6 +58,15 @@ async def test_fuzz_empty_payloads():
 
 @pytest.mark.anyio
 async def test_fuzz_missing_url():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/fuzz", json={
+            "payloads": [{"payload": "<script>", "target_param": "q"}],
+        })
+    assert resp.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_legacy_test_route_still_aliases_fuzz():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/test", json={
             "payloads": [{"payload": "<script>", "target_param": "q"}],
@@ -116,7 +125,7 @@ async def test_fuzz_reflected_payload(
     mock_dom_scan.return_value = MockScanResult([])
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post("/test", json={
+        resp = await client.post("/fuzz", json={
             "url": "https://example.com",
             "payloads": [{"payload": "<script>alert(1)</script>", "target_param": "q", "confidence": 0.9}],
             "verify_execution": False,
@@ -159,7 +168,7 @@ async def test_fuzz_non_reflected_not_vuln(
     mock_dom_scan.return_value = MockScanResult([])
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post("/test", json={
+        resp = await client.post("/fuzz", json={
             "url": "https://example.com",
             "payloads": [{"payload": "<script>alert(1)</script>", "target_param": "q", "confidence": 0.9}],
             "verify_execution": True,

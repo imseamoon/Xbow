@@ -154,8 +154,9 @@ async def training_stats():
     return get_training_stats()
 
 
-@app.post("/test", response_model=FuzzResponse)
-async def test(request: FuzzRequest):
+@app.post("/test", response_model=FuzzResponse, include_in_schema=False)
+@app.post("/fuzz", response_model=FuzzResponse)
+async def fuzz(request: FuzzRequest):
     """
     test payloads against target url.
     pipeline: send → check reflection → verify in browser → scan dom

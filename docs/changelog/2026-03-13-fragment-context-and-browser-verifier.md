@@ -212,6 +212,7 @@ real `load` event for all DOM0 (`window.onload = fn`) and DOM2
 this flag on `load` event handlers.
 
 **Result:**
+
 - **3 vulns found** (up from 2 before any fixes)
 - **`executed: true`** on the new `__fragment__` finding (previously `false`)
 - **`browserAlertTriggered: true`** — Playwright confirmed the `alert()` fired
@@ -250,10 +251,11 @@ intent but wrong in practice because:
 2. **Per-payload overhead multiplies** — 50 payloads × 5s = 250s of browser
    time, easily exceeding the 150–210s HTTP timeout
 3. **The fix was in the wrong layer** — The HTTP timeout in
-   `fuzzer-client.service.ts` wraps the entire `/test` batch request. Making
+   `fuzzer-client.service.ts` wraps the entire fuzzer batch request. Making
    individual payload verification slower makes the whole batch slower.
 
 The synthetic dispatch approach works because it:
+
 - Decouples the onload trigger from resource loading
 - Keeps per-payload overhead deterministic (~200ms)
 - Does not affect the HTTP timeout at all

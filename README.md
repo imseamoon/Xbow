@@ -20,7 +20,7 @@ Core API (NestJS :3000)
         │
         ├─ Context module      FastAPI :5001  POST /analyze
         ├─ Payload-gen module  FastAPI :5002  POST /generate, GET /ranker/info
-        └─ Fuzzer module       FastAPI :5003  POST /test
+        └─ Fuzzer module       FastAPI :5003  POST /fuzz
 ```
 
 Docker Compose also starts Redis on `6379`, PostgreSQL on `5432`, and mounts runtime artifacts for reports, model files, ranker files, dataset splits, and fuzzer training data.

@@ -25,6 +25,15 @@ function mockHttpError(msg: string) {
   } as any;
 }
 
+function mockHttpStatusThenResponse(status: number, response: any) {
+  return {
+    post: jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ response: { status } })))
+      .mockReturnValueOnce(of({ data: response })),
+  } as any;
+}
+
 /* ── ContextClientService ─────────────────────────────────── */
 
 describe('ContextClientService', () => {
@@ -87,16 +96,37 @@ describe('PayloadClientService', () => {
 /* ── FuzzerClientService ──────────────────────────────────── */
 
 describe('FuzzerClientService', () => {
-  it('calls POST /test and returns results', async () => {
+  it('calls POST /fuzz and returns results', async () => {
     const resp = { results: [{ payload: '<script>', target_param: 'q', reflected: true, executed: false, vuln: false, type: '', evidence: {} }] };
     const http = mockHttp(resp);
     const svc = new FuzzerClientService(http, mockConfig());
     const result = await svc.test({ url: 'https://t.com', payloads: [], verifyExecution: true, timeout: 5000 });
     expect(http.post).toHaveBeenCalledWith(
-      'http://localhost:5003/test',
+      'http://localhost:5003/fuzz',
       expect.objectContaining({ verify_execution: true }),
+      expect.objectContaining({ timeout: 120000 }),
     );
     expect(result.results).toHaveLength(1);
+  });
+
+  it('falls back to legacy POST /test when /fuzz is missing', async () => {
+    const resp = { results: [] };
+    const http = mockHttpStatusThenResponse(404, resp);
+    const svc = new FuzzerClientService(http, mockConfig());
+    const result = await svc.test({ url: 'https://t.com', payloads: [], verifyExecution: true, timeout: 5000 });
+    expect(http.post).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:5003/fuzz',
+      expect.objectContaining({ verify_execution: true }),
+      expect.objectContaining({ timeout: 120000 }),
+    );
+    expect(http.post).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:5003/test',
+      expect.objectContaining({ verify_execution: true }),
+      expect.objectContaining({ timeout: 120000 }),
+    );
+    expect(result.results).toHaveLength(0);
   });
 
   it('remaps verifyExecution to verify_execution for Python API', async () => {
