@@ -1,21 +1,34 @@
 # RedSentinel Docs
 
-Read these in order when onboarding:
+These documents are the canonical documentation set for the current implementation:
 
-1. `../README.md` — project overview, quick start, API, test commands.
-2. `../RUN.md` — full local setup and run guide.
-3. `ARCHITECTURE.md` — service responsibilities and scan pipeline.
-4. `REPOSITORY_GUIDE.md` — directory ownership, artifact policy, dependency policy.
-5. `SCAN_PARAMETERS_GUIDE.md` — scan tuning behavior.
-6. `ML_GUIDE.md` — concise ML/data/model maintenance guide.
+1. `../README.md` — project entry point: concise overview, quick start, implemented endpoint summary, and links to deeper docs.
+2. `../RUN.md` — full local setup and run guide with operational commands.
+3. `ARCHITECTURE.md` — detailed architecture, Core API reference, Python microservice contracts, report behavior, health behavior, and severity model.
+4. `SCAN_PARAMETERS_GUIDE.md` — implemented Core scan option names, ranges, target-site auth options, and tuning behavior.
+5. `ML_GUIDE.md` — model/data/ranker ownership, ML fallback behavior, and taxonomy guidance.
+6. `../dataset/README.md` — dataset sources, generated dataset layout, dataset runtime use, and raw-source download notes.
+7. `REPOSITORY_GUIDE.md` — directory ownership, artifact policy, dependency policy, and documentation hygiene rules.
+8. `DOCS_CODE_ALIGNMENT_AUDIT.md` — documentation/code alignment audit, cleanup record, and known remaining code-level inconsistencies.
+
+## Source-of-truth order
+
+When documentation and implementation disagree, use this order:
+
+1. Actual application code
+2. DTOs, Pydantic schemas, TypeScript interfaces, service clients
+3. Docker Compose and runtime configuration
+4. Tests and package scripts
+5. Current canonical docs
+6. Archived docs only as historical reference
 
 ## Secondary References
 
-- `evaluation/` — dataset and model evaluation reports, including generated charts.
-- `archive/` — historical plans, progress notes, bug investigations, and older
-  deep dives. These are preserved for context, but they are not canonical.
+- `evaluation/` — current evaluation reports and generated charts when they support a tracked report.
+- `archive/` — historical plans, progress notes, older investigations, and stale deep dives. These files are preserved for context only and are not canonical for current API, schema, architecture, dataset, or ML claims.
 
-## Rule
+## Documentation rule
 
-If a new document is not part of the main onboarding path, put it under
-`archive/` or a clearly named subdirectory with a short index.
+Keep canonical docs concise and implementation-defensible. Do not claim exact dataset counts, CVSS/ALE scoring, always-on XGBoost ranking, direct report downloads from `/scan/:id/report`, or a single universal six-class taxonomy unless the current code proves it.
+
+If a new document is not part of the main onboarding path, place it under `archive/` or a clearly named subdirectory with a short index.
