@@ -345,7 +345,7 @@ pushing past the timeout.
 
 **Mitigation options:**
 1. **Run postMessage and localStorage tests in separate HTTP requests**
-   (new `/test/postmessage` and `/test/localstorage` endpoints)
+   (future dedicated fuzzer endpoints, for example `/fuzz/postmessage` and `/fuzz/localstorage`)
 2. **Increase the HTTP timeout for fuzzer requests** (from 210s to 300s+)
 3. **Reduce concurrency** to keep total time linear rather than stacking
 

@@ -68,9 +68,8 @@ A third pass checked smaller wording and mapping issues after redundancy cleanup
 
 1. `modules/shared/schemas.py` defines richer context request fields (`form_method`, `form_fields`, `display_url`) than the local `modules/context-module/app.py` `AnalyzeRequest`, which currently accepts only `url`, `params`, and `waf`.
 2. `ContextClientService` can forward `cookie_header`, but the context module local Pydantic request model does not declare it. Pydantic may ignore extra fields depending on defaults; this should be made explicit in code if authenticated context probing is required.
-3. `FuzzerClientService` can forward `auth_cookie_header` and `auth_storage_state`, but `modules/shared/schemas.py` `FuzzRequest` does not declare those fields. Confirm whether FastAPI/Pydantic ignores them or update the schema if fuzzer-side authenticated browser/HTTP requests are intended.
-4. Core contains both `userauth/` JWT/session auth and `auth/` API-key auth concepts. Docs now distinguish them, but future code cleanup could make intended public API auth clearer.
-5. Report generation supports multiple formats through `ReportController`, while `ScanController.getReport()` returns only a static HTML URL pointer. This is now documented, but the API may be clearer if these surfaces are consolidated later.
+3. Core contains both `userauth/` JWT/session auth and `auth/` API-key auth concepts. Docs now distinguish them, but future code cleanup could make intended public API auth clearer.
+4. Report generation supports multiple formats through `ReportController`, while `ScanController.getReport()` returns only a static HTML URL pointer. This is now documented, but the API may be clearer if these surfaces are consolidated later.
 
 ## Stale-term search results
 

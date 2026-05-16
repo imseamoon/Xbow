@@ -46,11 +46,58 @@ class VerifyResult:
     error: str | None = None
 
 
+async def _new_context(
+    browser,
+    target_url: str,
+    auth_cookie_header: str | None = None,
+    auth_storage_state: dict | None = None,
+):
+    context_options = {
+        "ignore_https_errors": True,
+        "java_script_enabled": True,
+        "user_agent": DEFAULT_USER_AGENT,
+        "extra_http_headers": dict(DEFAULT_HEADERS),
+    }
+    if auth_storage_state:
+        context_options["storage_state"] = auth_storage_state
+
+    context = await browser.new_context(**context_options)
+    if auth_cookie_header and not auth_storage_state:
+        cookies = _cookie_header_to_playwright_cookies(auth_cookie_header, target_url)
+        if cookies:
+            await context.add_cookies(cookies)
+    return context
+
+
+def _cookie_header_to_playwright_cookies(
+    cookie_header: str,
+    target_url: str,
+) -> list[dict]:
+    parsed = urlparse(target_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    cookies = []
+    for part in cookie_header.split(";"):
+        if "=" not in part:
+            continue
+        name, value = part.split("=", 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append({
+            "name": name,
+            "value": value.strip(),
+            "url": base_url,
+        })
+    return cookies
+
+
 async def verify_payloads(
     url: str,
     reflected_results: list[dict],
     timeout_ms: int = 10000,
     concurrency: int = 3,
+    auth_cookie_header: str | None = None,
+    auth_storage_state: dict | None = None,
 ) -> list[VerifyResult]:
     """
     verify reflected payloads using headless chromium.
@@ -102,7 +149,15 @@ async def verify_payloads(
 
             try:
                 tasks = [
-                    _verify_one(browser, semaphore, url, entry, timeout_ms)
+                    _verify_one(
+                        browser,
+                        semaphore,
+                        url,
+                        entry,
+                        timeout_ms,
+                        auth_cookie_header=auth_cookie_header,
+                        auth_storage_state=auth_storage_state,
+                    )
                     for entry in reflected_results
                 ]
                 raw = await asyncio.gather(*tasks, return_exceptions=True)
@@ -139,6 +194,8 @@ async def _verify_one(
     base_url: str,
     entry: dict,
     timeout_ms: int,
+    auth_cookie_header: str | None = None,
+    auth_storage_state: dict | None = None,
 ) -> VerifyResult:
     """verify a single payload in a fresh browser context"""
     async with semaphore:
@@ -146,11 +203,11 @@ async def _verify_one(
         param = entry.get("target_param", "")
         start = time.monotonic()
 
-        context = await browser.new_context(
-            ignore_https_errors=True,
-            java_script_enabled=True,
-            user_agent=DEFAULT_USER_AGENT,
-            extra_http_headers=DEFAULT_HEADERS,
+        context = await _new_context(
+            browser,
+            base_url,
+            auth_cookie_header=auth_cookie_header,
+            auth_storage_state=auth_storage_state,
         )
 
         page = await context.new_page()
@@ -465,6 +522,8 @@ async def verify_stored_form_payloads(
     form_fields: dict,
     timeout_ms: int = 10000,
     concurrency: int = 3,
+    auth_cookie_header: str | None = None,
+    auth_storage_state: dict | None = None,
 ) -> list[VerifyResult]:
     """
     verify stored/dom-based xss by submitting form payloads via headless browser.
@@ -517,7 +576,16 @@ async def verify_stored_form_payloads(
 
             try:
                 tasks = [
-                    _verify_stored_one(browser, semaphore, page_url, entry, form_fields, timeout_ms)
+                    _verify_stored_one(
+                        browser,
+                        semaphore,
+                        page_url,
+                        entry,
+                        form_fields,
+                        timeout_ms,
+                        auth_cookie_header=auth_cookie_header,
+                        auth_storage_state=auth_storage_state,
+                    )
                     for entry in payload_entries
                 ]
                 raw = await asyncio.gather(*tasks, return_exceptions=True)
@@ -555,6 +623,8 @@ async def _verify_stored_one(
     entry: dict,
     form_fields: dict,
     timeout_ms: int,
+    auth_cookie_header: str | None = None,
+    auth_storage_state: dict | None = None,
 ) -> VerifyResult:
     """verify a single stored/dom payload by submitting a form in a fresh browser context"""
     async with semaphore:
@@ -562,11 +632,11 @@ async def _verify_stored_one(
         param = entry.get("target_param", "")
         start = time.monotonic()
 
-        context = await browser.new_context(
-            ignore_https_errors=True,
-            java_script_enabled=True,
-            user_agent=DEFAULT_USER_AGENT,
-            extra_http_headers=DEFAULT_HEADERS,
+        context = await _new_context(
+            browser,
+            page_url,
+            auth_cookie_header=auth_cookie_header,
+            auth_storage_state=auth_storage_state,
         )
 
         page = await context.new_page()

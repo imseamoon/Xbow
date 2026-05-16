@@ -144,6 +144,69 @@ async def test_fuzz_reflected_payload(
 @patch("fuzzer_app.check_reflection_batch")
 @patch("fuzzer_app.verify_payloads", new_callable=AsyncMock)
 @patch("fuzzer_app.scan_response_body")
+async def test_fuzz_forwards_auth_to_http_and_browser(
+    mock_dom_scan, mock_verify, mock_reflect, mock_send
+):
+    storage_state = {
+        "cookies": [
+            {
+                "name": "session",
+                "value": "tok123",
+                "domain": "example.com",
+                "path": "/",
+                "expires": -1,
+                "httpOnly": True,
+                "secure": True,
+                "sameSite": "Lax",
+            }
+        ],
+        "origins": [],
+    }
+    mock_send.return_value = MockSendBatch([
+        MockSendResult(
+            payload="<script>alert(1)</script>",
+            target_param="q",
+            response_body="<html><script>alert(1)</script></html>",
+            status_code=200,
+        ),
+    ])
+    mock_reflect.return_value = [
+        {
+            "payload": "<script>alert(1)</script>",
+            "target_param": "q",
+            "reflected": True,
+            "exact_match": True,
+            "status_code": 200,
+            "reflection_position": "html_body",
+            "context_snippet": "<html><script>alert(1)</script></html>",
+        }
+    ]
+    mock_verify.return_value = []
+    mock_dom_scan.return_value = MockScanResult([])
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/fuzz", json={
+            "url": "https://example.com",
+            "payloads": [{"payload": "<script>alert(1)</script>", "target_param": "q", "confidence": 0.9}],
+            "verify_execution": True,
+            "timeout": 5000,
+            "auth_cookie_header": "session=tok123",
+            "auth_storage_state": storage_state,
+        })
+
+    assert resp.status_code == 200
+    mock_send.assert_awaited_once()
+    assert mock_send.await_args.kwargs["auth_cookie_header"] == "session=tok123"
+    mock_verify.assert_awaited_once()
+    assert mock_verify.await_args.kwargs["auth_cookie_header"] == "session=tok123"
+    assert mock_verify.await_args.kwargs["auth_storage_state"] == storage_state
+
+
+@pytest.mark.anyio
+@patch("fuzzer_app.send_payloads", new_callable=AsyncMock)
+@patch("fuzzer_app.check_reflection_batch")
+@patch("fuzzer_app.verify_payloads", new_callable=AsyncMock)
+@patch("fuzzer_app.scan_response_body")
 async def test_fuzz_non_reflected_not_vuln(
     mock_dom_scan, mock_verify, mock_reflect, mock_send
 ):

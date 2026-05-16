@@ -71,6 +71,9 @@ class FuzzRequest(BaseModel):
     context: str | None = None  # context label (e.g., 'script_injection')
     waf: str | None = None  # waf type detected (e.g., 'cloudflare')
     allowed_chars: list[str] | None = None  # allowed special characters
+    # authenticated scan session forwarded by Core
+    auth_cookie_header: str | None = None
+    auth_storage_state: dict | None = None
 
 
 class FuzzResult(BaseModel):

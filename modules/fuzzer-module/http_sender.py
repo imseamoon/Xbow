@@ -31,6 +31,13 @@ FRAGMENT_PARAM = "__fragment__"
 INJECT_METHODS = ["GET", "POST"]
 
 
+def _headers_with_auth(auth_cookie_header: str | None = None) -> dict[str, str]:
+    headers = dict(DEFAULT_HEADERS)
+    if auth_cookie_header:
+        headers["Cookie"] = auth_cookie_header
+    return headers
+
+
 @dataclass
 class SendResult:
     """result of sending a single payload"""
@@ -59,6 +66,7 @@ async def send_payloads(
     timeout_ms: int = 10000,
     concurrency: int = 10,
     methods: list[str] | None = None,
+    auth_cookie_header: str | None = None,
 ) -> SendBatch:
     """
     send all payloads against the target url.
@@ -71,7 +79,7 @@ async def send_payloads(
     timeout_s = timeout_ms / 1000
 
     async with httpx.AsyncClient(
-        headers=DEFAULT_HEADERS,
+        headers=_headers_with_auth(auth_cookie_header),
         timeout=httpx.Timeout(timeout_s, connect=5.0),
         follow_redirects=True,
         verify=False,
@@ -106,6 +114,7 @@ async def send_payloads(
 async def fetch_url(
     url: str,
     timeout_ms: int = 10000,
+    auth_cookie_header: str | None = None,
 ) -> SendResult:
     """Fetch a URL once (no injection).
 
@@ -115,7 +124,7 @@ async def fetch_url(
     start = time.monotonic()
 
     async with httpx.AsyncClient(
-        headers=DEFAULT_HEADERS,
+        headers=_headers_with_auth(auth_cookie_header),
         timeout=httpx.Timeout(timeout_s, connect=5.0),
         follow_redirects=True,
         verify=False,
@@ -220,6 +229,7 @@ async def send_stored_payloads(
     form_fields: dict[str, str],
     timeout_ms: int = 10000,
     concurrency: int = 5,
+    auth_cookie_header: str | None = None,
 ) -> SendBatch:
     """
     Stored XSS mode: for each payload, POST to store_url with all form_fields
@@ -235,7 +245,7 @@ async def send_stored_payloads(
     timeout_s = timeout_ms / 1000
 
     async with httpx.AsyncClient(
-        headers=DEFAULT_HEADERS,
+        headers=_headers_with_auth(auth_cookie_header),
         timeout=httpx.Timeout(timeout_s, connect=5.0),
         follow_redirects=True,
         verify=False,

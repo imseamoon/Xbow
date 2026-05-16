@@ -166,6 +166,8 @@ async def fuzz(request: FuzzRequest):
     payloads = [p.model_dump() for p in request.payloads]
     verify_execution = request.verify_execution
     timeout_ms = request.timeout
+    auth_cookie_header = request.auth_cookie_header
+    auth_storage_state = request.auth_storage_state
 
     # ── Stored XSS mode ─────────────────────────────────────────────
     stored_mode = request.stored_mode
@@ -178,7 +180,11 @@ async def fuzz(request: FuzzRequest):
         logger.info(
             f"dom-only scan {url}, timeout={timeout_ms}ms"
         )
-        fetched = await fetch_url(url=url, timeout_ms=timeout_ms)
+        fetched = await fetch_url(
+            url=url,
+            timeout_ms=timeout_ms,
+            auth_cookie_header=auth_cookie_header,
+        )
         if fetched.error or not fetched.response_body:
             logger.warning(
                 f"dom-only fetch failed for {url}: {fetched.error}"
@@ -228,7 +234,11 @@ async def fuzz(request: FuzzRequest):
 
         # DOM-only scan on the base page to report static sink/source findings
         try:
-            fetched = await fetch_url(url=url, timeout_ms=timeout_ms)
+            fetched = await fetch_url(
+                url=url,
+                timeout_ms=timeout_ms,
+                auth_cookie_header=auth_cookie_header,
+            )
             if fetched.response_body:
                 scan_result = scan_response_body(fetched.response_body, url)
                 if scan_result.findings:
@@ -248,6 +258,8 @@ async def fuzz(request: FuzzRequest):
             reflected_results=browser_entries,
             timeout_ms=timeout_ms,
             concurrency=3,
+            auth_cookie_header=auth_cookie_header,
+            auth_storage_state=auth_storage_state,
         )
         seen_frag: set[str] = set()
         for vr in verify_results:
@@ -299,6 +311,7 @@ async def fuzz(request: FuzzRequest):
             form_fields=form_fields,
             timeout_ms=timeout_ms,
             concurrency=5,
+            auth_cookie_header=auth_cookie_header,
         )
 
         # Check reflection on display page responses
@@ -389,6 +402,8 @@ async def fuzz(request: FuzzRequest):
                     form_fields=form_fields,
                     timeout_ms=timeout_ms,
                     concurrency=3,
+                    auth_cookie_header=auth_cookie_header,
+                    auth_storage_state=auth_storage_state,
                 )
                 seen_browser: set[str] = set()
                 for br in browser_results:
@@ -450,6 +465,7 @@ async def fuzz(request: FuzzRequest):
         payloads=payloads,
         timeout_ms=timeout_ms,
         concurrency=10,
+        auth_cookie_header=auth_cookie_header,
     )
 
     # step 2: check which payloads are reflected in responses
@@ -489,6 +505,8 @@ async def fuzz(request: FuzzRequest):
             reflected_results=exact_reflected,
             timeout_ms=timeout_ms,
             concurrency=3,
+            auth_cookie_header=auth_cookie_header,
+            auth_storage_state=auth_storage_state,
         )
         for vr in verify_results:
             key = f"{vr.payload}:{vr.target_param}"

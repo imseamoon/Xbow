@@ -347,7 +347,7 @@ Target application login is configured in the scan request body under `options.a
 }
 ```
 
-When login succeeds, Core captures cookies/storage state and passes the authenticated session into crawling, context probing, and fuzzing where supported by the bridge clients. If login fails, the current processor logs the failure and continues unauthenticated.
+When login succeeds, Core captures cookies/storage state and passes the authenticated session into crawling, context probing, and fuzzer HTTP/browser verification. If login fails, the current processor logs the failure and continues unauthenticated.
 
 ---
 

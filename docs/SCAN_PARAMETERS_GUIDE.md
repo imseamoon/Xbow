@@ -147,7 +147,7 @@ These are operational suggestions, not hard-coded modes.
 | `postLoginWaitMs` | no | Wait after submit; default 3000 ms, range 500-30000. |
 | `successUrlContains` | no | Optional URL substring used as a success signal. |
 
-When login succeeds, Core captures cookies/storage state and forwards the session into crawling, context probing, and fuzzing where supported by the bridge clients. If login fails, the current scan processor records the failure and continues unauthenticated.
+When login succeeds, Core captures cookies/storage state and forwards the session into crawling, context probing, and fuzzer HTTP/browser verification. If login fails, the current scan processor records the failure and continues unauthenticated.
 
 ---
 

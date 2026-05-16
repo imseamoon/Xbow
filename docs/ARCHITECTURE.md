@@ -303,7 +303,12 @@ Implemented shared request model:
   "form_fields": {},
   "context": "html_body",
   "waf": "none",
-  "allowed_chars": ["<", ">"]
+  "allowed_chars": ["<", ">"],
+  "auth_cookie_header": "session=abc123",
+  "auth_storage_state": {
+    "cookies": [],
+    "origins": []
+  }
 }
 ```
 
