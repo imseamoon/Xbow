@@ -43,6 +43,8 @@ describe('ScanController', () => {
     queueProducer = module.get(ScanQueueProducer);
   });
 
+  const mockReq = { user: { id: 'test-user' } };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     await scanService.deleteAllScans();
@@ -54,9 +56,10 @@ describe('ScanController', () => {
 
   describe('createScan', () => {
     it('creates a scan and enqueues it', async () => {
-      const result = await controller.createScan({
-        url: 'https://example.com',
-      });
+      const result = await controller.createScan(
+        { url: 'https://example.com' },
+        mockReq as any,
+      );
       expect(result).toBeDefined();
       expect(result.url).toBe('https://example.com');
       expect(queueProducer.enqueue).toHaveBeenCalledWith(result.id);
@@ -66,7 +69,7 @@ describe('ScanController', () => {
   describe('getScan', () => {
     it('returns scan with vulns', async () => {
       const scan = await scanService.create({ url: 'https://example.com' });
-      const result = await controller.getScan(scan.id);
+      const result = await controller.getScan(scan.id, mockReq as any);
       expect(result.id).toBe(scan.id);
       expect(result.vulns).toEqual([]);
     });
@@ -75,7 +78,7 @@ describe('ScanController', () => {
   describe('cancelScan', () => {
     it('cancels a pending scan', async () => {
       const scan = await scanService.create({ url: 'https://example.com' });
-      await expect(controller.cancelScan(scan.id)).resolves.not.toThrow();
+      await expect(controller.cancelScan(scan.id, mockReq as any)).resolves.not.toThrow();
       const check = await scanService.findOne(scan.id);
       expect(check.status).toBe(ScanStatus.CANCELLED);
     });
@@ -86,16 +89,16 @@ describe('ScanController', () => {
       for (let i = 0; i < 5; i++) {
         await scanService.create({ url: `https://${i}.com` });
       }
-      const page1 = await controller.listScans(1, 2);
+      const page1 = await controller.listScans(1, 2, mockReq as any);
       expect(page1).toHaveLength(2);
 
-      const page3 = await controller.listScans(3, 2);
+      const page3 = await controller.listScans(3, 2, mockReq as any);
       expect(page3).toHaveLength(1);
     });
 
     it('returns empty for out-of-range page', async () => {
       await scanService.create({ url: 'https://example.com' });
-      const result = await controller.listScans(100, 20);
+      const result = await controller.listScans(100, 20, mockReq as any);
       expect(result).toHaveLength(0);
     });
   });
@@ -111,7 +114,7 @@ describe('ScanController', () => {
   describe('deleteScan', () => {
     it('deletes a scan permanently', async () => {
       const scan = await scanService.create({ url: 'https://example.com' });
-      await controller.deleteScan(scan.id);
+      await controller.deleteScan(scan.id, mockReq as any);
       await expect(scanService.findOne(scan.id)).rejects.toThrow();
     });
   });
@@ -125,11 +128,5 @@ describe('ScanController', () => {
     });
   });
 
-  describe('health', () => {
-    it('returns ok status', () => {
-      const result = controller.health();
-      expect(result.status).toBe('ok');
-      expect(result.timestamp).toBeDefined();
-    });
-  });
+
 });

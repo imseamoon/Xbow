@@ -43,6 +43,9 @@ describe('ReportService', () => {
       expect(vuln.payload).toBe('<script>alert(1)</script>');
       expect(vuln.reflected).toBe(true);
       expect(vuln.executed).toBe(true);
+      expect(vuln.evidence.riskAnalysis).toMatchObject({
+        model: 'cvss_v3_1_inspired_expected_loss',
+      });
     });
 
     it('assigns HIGH severity when browser alert triggered', () => {
@@ -161,6 +164,10 @@ describe('ReportService', () => {
       expect(report.vulnerabilities[0].payload).toBe(
         '<script>alert(1)</script>',
       );
+      expect(report.vulnerabilities[0].riskAnalysis.model).toBe(
+        'cvss_v3_1_inspired_expected_loss',
+      );
+      expect(report.vulnerabilities[0].evidence.riskAnalysis).toBeDefined();
     });
   });
 });

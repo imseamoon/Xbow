@@ -271,6 +271,30 @@
 
     .fix-box p { color: var(--green) !important; font-size: 10px !important; }
 
+    .risk-model-box {
+      background: #eef5ff;
+      border: 1px solid #c7dbff;
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+
+    .risk-model-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px 8px;
+      margin-top: 4px;
+      font-size: 9px;
+    }
+
+    .risk-model-label {
+      color: var(--muted);
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .risk-model-value { font-weight: 600; word-break: break-word; }
+
     /* ── No vulns ──────────────────── */
     .no-vulns { text-align: center; padding: 30px 10px; }
     .no-vulns .checkmark { font-size: 30px; margin-bottom: 6px; }
@@ -339,6 +363,10 @@
     </div>
   </div>
 
+  <p style="color:var(--muted); font-size:8px; margin:-6px 0 10px;">
+    {{riskAnalysisDisclaimer}}
+  </p>
+
   {{#if hasVulns}}
 
   <!-- Affected Pages -->
@@ -360,6 +388,7 @@
         <th>Page</th>
         <th>Input</th>
         <th>Risk</th>
+        <th>CVSS</th>
         <th>Code Ran?</th>
       </tr>
     </thead>
@@ -370,6 +399,13 @@
         <td style="word-break:break-all; max-width:180px;">{{this.url}}</td>
         <td><strong>{{this.param}}</strong></td>
         <td class="sev-{{this.severityClass}}">{{this.severity}}</td>
+        <td>
+          {{#if this.riskAnalysis}}
+            {{this.riskAnalysis.cvssBaseScore}} / {{this.riskAnalysis.cvssSeverity}}
+          {{else}}
+            N/A
+          {{/if}}
+        </td>
         <td>
           {{#if this.confirmedDangerous}}
             <span class="badge badge-yes">Yes</span>
@@ -425,6 +461,36 @@
         </div>
       </div>
     </div>
+
+    {{#if this.riskAnalysis}}
+    <div class="vuln-section">
+      <div class="vuln-section-title">Analytical Risk Model</div>
+      <div class="risk-model-box">
+        <p>
+          CVSS-inspired vector <strong>{{this.riskAnalysis.cvssVectorString}}</strong>.
+          Report-layer interpretation only.
+        </p>
+        <div class="risk-model-grid">
+          <div>
+            <div class="risk-model-label">CVSS base</div>
+            <div class="risk-model-value">{{this.riskAnalysis.cvssBaseScore}} ({{this.riskAnalysis.cvssSeverity}})</div>
+          </div>
+          <div>
+            <div class="risk-model-label">Exploit probability</div>
+            <div class="risk-model-value">{{this.riskAnalysis.exploitProbability}}</div>
+          </div>
+          <div>
+            <div class="risk-model-label">SLE</div>
+            <div class="risk-model-value">{{this.riskAnalysis.singleLossExpectancy}}</div>
+          </div>
+          <div>
+            <div class="risk-model-label">ALE</div>
+            <div class="risk-model-value">{{this.riskAnalysis.annualizedLossExpectancy}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {{/if}}
 
     <div class="vuln-section">
       <div class="vuln-section-title">How to fix it</div>

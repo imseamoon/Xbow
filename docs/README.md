@@ -29,6 +29,6 @@ When documentation and implementation disagree, use this order:
 
 ## Documentation rule
 
-Keep canonical docs concise and implementation-defensible. Do not claim exact dataset counts, CVSS/ALE scoring, always-on XGBoost ranking, direct report downloads from `/scan/:id/report`, or a single universal six-class taxonomy unless the current code proves it.
+Keep canonical docs concise and implementation-defensible. Do not claim exact dataset counts, always-on XGBoost ranking, direct report downloads from `/scan/:id/report`, or a single universal six-class taxonomy unless the current code proves it. Runtime severity is rule-based; CVSS/ALE/expected-loss wording must refer only to the separate report-layer analytical model.
 
 If a new document is not part of the main onboarding path, place it under `archive/` or a clearly named subdirectory with a short index.

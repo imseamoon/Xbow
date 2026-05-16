@@ -367,7 +367,9 @@ Training/evaluation labels may use narrower label sets depending on the specific
 
 ## 10. Severity Scoring
 
-Severity is implemented as a deterministic rule-based scorer in `core/src/common/utils/severity-scorer.ts`. It is not a CVSS implementation and does not calculate ALE or expected monetary loss.
+Runtime severity is implemented as a deterministic rule-based scorer in `core/src/common/utils/severity-scorer.ts`. This value remains the scanner's primary severity label.
+
+Reports also include a separate analytical risk model from `core/src/common/utils/risk-calculus.ts`. That report-layer model derives a CVSS v3.1-inspired vector, base score, exploit probability, Single Loss Expectancy (SLE), Annualized Rate of Occurrence (ARO), and Annualized Loss Expectancy (ALE). These values are interpretive evaluation fields and do not replace the runtime severity algorithm.
 
 Scoring axes:
 
@@ -394,6 +396,17 @@ Override rules:
 3. `CONFIRMED_SENSITIVE_EXEC`: executed payload containing `document.cookie` is CRITICAL.
 4. `WAF_BYPASS_MEDIUM_MINIMUM`: reflected exact-match payload containing `%` is at least MEDIUM.
 5. `POSTMESSAGE_MEDIUM_MINIMUM`: `postMessage`/`e.data` source is at least MEDIUM.
+
+Report-layer analytical risk fields:
+
+| Field | Meaning |
+|---|---|
+| `cvssVectorString` | CVSS v3.1-style metric vector inferred from scanner evidence |
+| `cvssBaseScore` | CVSS-inspired base score for critical evaluation |
+| `exploitProbability` | Estimated exploitation probability from reachability, execution evidence, complexity, interaction, and base score |
+| `singleLossExpectancy` | Estimated one-event loss using the configured/default asset value |
+| `annualizedRateOfOccurrence` | Estimated yearly occurrence rate |
+| `annualizedLossExpectancy` | `ARO × SLE`; comparative estimate, not a financial guarantee |
 
 ---
 

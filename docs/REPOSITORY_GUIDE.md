@@ -90,7 +90,7 @@ If a dependency is needed in both Docker and local development, update both the 
 - Use Python schema names for microservice contracts: `max_payloads`, `verify_execution`, `stored_mode`, `display_url`, and `form_fields`.
 - Document `/fuzz` as the canonical fuzzer route; `/test` is only a legacy compatibility alias.
 - Do not claim `/scan/:id/report` downloads HTML/PDF/JSON. It returns a report URL pointer only.
-- Do not claim CVSS, ALE, expected monetary loss, or formal risk calculus. Severity is rule-based.
+- Runtime severity is rule-based. CVSS-inspired, ALE, and expected-loss values may be documented only as the separate report-layer analytical model implemented in `core/src/common/utils/risk-calculus.ts`.
 - Use `HASH_SOURCE_MEDIUM_CAP`, not the stale `HASH_SOURCE_LOW_CAP` name.
 - Use “approximately 59K+” for dataset size unless a tracked script/artifact proves an exact count.
 - Mark `docs/archive/` as historical whenever referencing it.

@@ -16,6 +16,10 @@ import {
   deriveSink,
   deriveSource,
 } from '../common/utils/severity-scorer';
+import {
+  calculateRisk,
+  RiskCalculationResult,
+} from '../common/utils/risk-calculus';
 
 interface TemplateData {
   logoSrc: string;
@@ -31,6 +35,7 @@ interface TemplateData {
   riskLevel: string;
   riskClass: string;
   riskSummary: string;
+  riskAnalysisDisclaimer: string;
   counts: { critical: number; high: number; medium: number; low: number };
   affectedPages: string[];
   affectedPageCount: number;
@@ -62,6 +67,7 @@ interface TemplateVuln {
     reflectionPosition: string;
     browserAlertTriggered: boolean;
   };
+  riskAnalysis?: RiskCalculationResult;
 }
 
 @Injectable()
@@ -141,7 +147,19 @@ export class ReportService implements OnModuleDestroy {
     );
     const source = deriveSource(result.evidence.source);
 
-    const { severity } = scoreFinding({
+    const scoring = scoreFinding({
+      reflected: result.reflected,
+      executed: result.executed,
+      payload: result.payload,
+      source,
+      sink,
+      exactMatch: result.evidence.exact_match ?? false,
+      browserAlertTriggered: result.evidence.browser_alert_triggered,
+    });
+    const { severity } = scoring;
+    const riskAnalysis = calculateRisk({
+      type: this.mapType(result.type),
+      severity,
       reflected: result.reflected,
       executed: result.executed,
       payload: result.payload,
@@ -168,6 +186,10 @@ export class ReportService implements OnModuleDestroy {
         exactMatch: result.evidence.exact_match ?? false,
         sink,
         source,
+        severityScore: scoring.score,
+        severityBreakdown: scoring.breakdown,
+        severityOverrides: scoring.appliedOverrides,
+        riskAnalysis,
         ...(result.evidence.line !== undefined && {
           line: result.evidence.line,
         }),
@@ -329,7 +351,11 @@ export class ReportService implements OnModuleDestroy {
         url: v.url,
         reflected: v.reflected,
         executed: v.executed,
-        evidence: v.evidence,
+        evidence: {
+          ...v.evidence,
+          riskAnalysis: this.riskAnalysisForVuln(v),
+        },
+        riskAnalysis: this.riskAnalysisForVuln(v),
         discoveredAt: v.discoveredAt.toISOString(),
       })),
     };
@@ -520,32 +546,57 @@ export class ReportService implements OnModuleDestroy {
       riskLevel,
       riskClass,
       riskSummary,
+      riskAnalysisDisclaimer:
+        'Analytical risk values use CVSS v3.1-inspired and expected-loss formulas for report interpretation only. Runtime severity is still assigned by RedSentinel’s rule-based severity scorer.',
       counts,
       affectedPages,
       affectedPageCount: affectedPages.length,
-      vulns: vulns.map((v, i) => ({
-        index: i + 1,
-        url: v.url,
-        param: v.param,
-        payload: v.payload,
-        type: v.type,
-        typeFriendly: this.friendlyType(v.type),
-        typeExplanation: this.typeExplanation(v.type),
-        severity: v.severity,
-        severityClass: v.severity.toLowerCase(),
-        severityExplanation: this.severityExplanation(v.severity),
-        reflected: v.reflected,
-        executed: v.executed,
-        confirmedDangerous: v.executed && v.evidence.browserAlertTriggered,
-        reflectedText: v.reflected ? 'Yes' : 'No',
-        executedText: v.executed ? 'Yes' : 'No',
-        reflectedBadge: v.reflected ? 'badge-yes' : 'badge-no',
-        executedBadge: v.executed ? 'badge-yes' : 'badge-no',
-        whatHappened: this.whatHappened(v),
-        howToFix: this.howToFix(v),
-        evidence: v.evidence,
-      })),
+      vulns: vulns.map((v, i) => {
+        const riskAnalysis = this.riskAnalysisForVuln(v);
+        return {
+          index: i + 1,
+          url: v.url,
+          param: v.param,
+          payload: v.payload,
+          type: v.type,
+          typeFriendly: this.friendlyType(v.type),
+          typeExplanation: this.typeExplanation(v.type),
+          severity: v.severity,
+          severityClass: v.severity.toLowerCase(),
+          severityExplanation: this.severityExplanation(v.severity),
+          reflected: v.reflected,
+          executed: v.executed,
+          confirmedDangerous: v.executed && v.evidence.browserAlertTriggered,
+          reflectedText: v.reflected ? 'Yes' : 'No',
+          executedText: v.executed ? 'Yes' : 'No',
+          reflectedBadge: v.reflected ? 'badge-yes' : 'badge-no',
+          executedBadge: v.executed ? 'badge-yes' : 'badge-no',
+          whatHappened: this.whatHappened(v),
+          howToFix: this.howToFix(v),
+          evidence: v.evidence,
+          riskAnalysis,
+        };
+      }),
     };
+  }
+
+  private riskAnalysisForVuln(v: Vuln): RiskCalculationResult {
+    const existing = v.evidence.riskAnalysis as
+      | RiskCalculationResult
+      | undefined;
+    if (existing) return existing;
+
+    return calculateRisk({
+      type: v.type,
+      severity: v.severity,
+      reflected: v.reflected,
+      executed: v.executed,
+      payload: v.payload,
+      source: v.evidence.source,
+      sink: v.evidence.sink,
+      exactMatch: v.evidence.exactMatch,
+      browserAlertTriggered: v.evidence.browserAlertTriggered,
+    });
   }
 
   private friendlyType(type: string): string {

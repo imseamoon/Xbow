@@ -28,6 +28,17 @@ export interface VulnEvidence {
   line?: number;
   snippet?: string;
   scriptUrl?: string;
+  /* severity scoring fields tracked on evidence */
+  severityScore?: number;
+  severityBreakdown?: {
+    execution: number;
+    shareability: number;
+    sinkDanger: number;
+    payload: number;
+  };
+  severityOverrides?: string[];
+  /* report-layer analytical risk model */
+  riskAnalysis?: any;
 }
 
 export interface Vuln {
