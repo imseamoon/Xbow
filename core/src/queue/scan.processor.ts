@@ -5,7 +5,10 @@ import { ScanService } from '../scan/scan.service';
 import { ScanGateway } from '../scan/scan.gateway';
 import { CrawlerService } from '../crawler/crawler.service';
 import { ContextClientService } from '../modules-bridge/context-client.service';
-import { PayloadClientService } from '../modules-bridge/payload-client.service';
+import {
+  PayloadClientService,
+  GeneratedPayload,
+} from '../modules-bridge/payload-client.service';
 import { FuzzerClientService } from '../modules-bridge/fuzzer-client.service';
 import { ReportService } from '../report/report.service';
 import { AuthService } from '../userauth/auth.service';
@@ -22,6 +25,21 @@ const SCAN_WORKER_CONCURRENCY = Math.max(
   1,
   Number(process.env.SCAN_WORKER_CONCURRENCY ?? 2),
 );
+
+/** Template-breakout payloads for __fragment__ auto-discovery.
+ *  These handle scenarios where the fragment value is concatenated into
+ *  an existing HTML template before DOM injection (e.g.
+ *  `jQuery.html('<tag>' + location.hash + '</tag>')`). Generic html_body
+ *  payloads (<script>…) land inside the quoted attribute and never execute. */
+const FRAGMENT_BREAKOUT_PAYLOADS: GeneratedPayload[] = [
+  { payload: "1' onerror='alert(1)", target_param: '__fragment__', context: 'attribute', confidence: 0.85, waf_bypass: false, technique: 'template_breakout', severity: 'high' },
+  { payload: '1" onerror="alert(1)', target_param: '__fragment__', context: 'attribute', confidence: 0.85, waf_bypass: false, technique: 'template_breakout', severity: 'high' },
+  { payload: "1'><img src=x onerror=alert(1)>", target_param: '__fragment__', context: 'attribute', confidence: 0.8, waf_bypass: false, technique: 'template_breakout', severity: 'high' },
+  { payload: '1"><img src=x onerror=alert(1)>', target_param: '__fragment__', context: 'attribute', confidence: 0.8, waf_bypass: false, technique: 'template_breakout', severity: 'high' },
+  { payload: "1' autofocus onfocus='alert(1)", target_param: '__fragment__', context: 'attribute', confidence: 0.75, waf_bypass: false, technique: 'template_breakout', severity: 'medium' },
+  { payload: '1" autofocus onfocus="alert(1)', target_param: '__fragment__', context: 'attribute', confidence: 0.75, waf_bypass: false, technique: 'template_breakout', severity: 'medium' },
+  { payload: '1 onmouseover=alert(1) //', target_param: '__fragment__', context: 'attribute', confidence: 0.7, waf_bypass: false, technique: 'template_breakout', severity: 'medium' },
+];
 
 function canonicalizeTargetUrl(
   rawUrl: string,
@@ -62,11 +80,19 @@ export class ScanProcessor extends WorkerHost {
   private extractPostId(url: string): string | null {
     try {
       const u = new URL(url);
-      for (const key of ['postId', 'post_id', 'id', 'articleId', 'article_id']) {
+      for (const key of [
+        'postId',
+        'post_id',
+        'id',
+        'articleId',
+        'article_id',
+      ]) {
         const val = u.searchParams.get(key);
         if (val) return val;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   }
 
@@ -80,7 +106,9 @@ export class ScanProcessor extends WorkerHost {
         scan = await this.scanService.findOne(scanId);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'scan not found';
-        this.logger.warn(`skipping scan job for missing scanId=${scanId}: ${detail}`);
+        this.logger.warn(
+          `skipping scan job for missing scanId=${scanId}: ${detail}`,
+        );
         return;
       }
 
@@ -117,13 +145,24 @@ export class ScanProcessor extends WorkerHost {
           this.logger.warn(
             `scan ${scanId} falling back to unauthenticated mode`,
           );
-          await this.scanService.addAuditLog(scanId, 'AUTH', `Authentication failed at ${scan.options.auth.loginUrl}: ${authResult.error}`, {
-            loginUrl: scan.options.auth.loginUrl,
-            error: authResult.error,
-          }, Date.now() - authStartedAt);
+          await this.scanService.addAuditLog(
+            scanId,
+            'AUTH',
+            `Authentication failed at ${scan.options.auth.loginUrl}: ${authResult.error}`,
+            {
+              loginUrl: scan.options.auth.loginUrl,
+              error: authResult.error,
+            },
+            Date.now() - authStartedAt,
+          );
         } else {
           authSession = authResult.session;
-          this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'AUTH', message: `Login successful at ${scan.options.auth.loginUrl}, ${authSession.storageState.cookies.length} cookies captured`, durationMs: Date.now() - authStartedAt });
+          this.scannerLog.append(scanId, {
+            timestamp: new Date().toISOString(),
+            phase: 'AUTH',
+            message: `Login successful at ${scan.options.auth.loginUrl}, ${authSession.storageState.cookies.length} cookies captured`,
+            durationMs: Date.now() - authStartedAt,
+          });
           this.gateway.emitProgress({
             scanId,
             phase: ScanPhase.AUTH,
@@ -133,16 +172,27 @@ export class ScanProcessor extends WorkerHost {
           this.logger.log(
             `scan ${scanId} authenticated successfully, proceeding with session`,
           );
-          await this.scanService.addAuditLog(scanId, 'AUTH', `Login successful at ${scan.options.auth.loginUrl}`, {
-            loginUrl: scan.options.auth.loginUrl,
-            cookiesCaptured: authSession.storageState.cookies.length,
-          }, Date.now() - authStartedAt);
+          await this.scanService.addAuditLog(
+            scanId,
+            'AUTH',
+            `Login successful at ${scan.options.auth.loginUrl}`,
+            {
+              loginUrl: scan.options.auth.loginUrl,
+              cookiesCaptured: authSession.storageState.cookies.length,
+            },
+            Date.now() - authStartedAt,
+          );
         }
       }
 
       // ── Phase 1: CRAWL ───────────────────────────────────────────────
       const crawlStartedAt = Date.now();
-      this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'CRAWL', message: 'Starting crawl phase', durationMs: 0 });
+      this.scannerLog.append(scanId, {
+        timestamp: new Date().toISOString(),
+        phase: 'CRAWL',
+        message: 'Starting crawl phase',
+        durationMs: 0,
+      });
       await this.scanService.updateStatus(
         scanId,
         ScanStatus.CRAWLING,
@@ -160,7 +210,8 @@ export class ScanProcessor extends WorkerHost {
 
       const urlParamsMap = new Map<string, string[]>();
       let waf = 'none';
-      let crawledForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] = [];
+      let crawledForms: import('../common/interfaces/crawler.interface').DiscoveredForm[] =
+        [];
       let allCrawledUrls: string[] = [];
 
       if (scan.options.singlePage) {
@@ -178,12 +229,17 @@ export class ScanProcessor extends WorkerHost {
 
         waf = crawlResult.waf.name ?? 'none';
         crawledForms = crawlResult.forms;
-        allCrawledUrls = crawlResult.urls.map((u) => canonicalizeTargetUrl(u).url);
+        allCrawledUrls = crawlResult.urls.map(
+          (u) => canonicalizeTargetUrl(u).url,
+        );
 
         for (const crawledUrl of crawlResult.urls) {
-          const { url: canonicalUrl, params } = canonicalizeTargetUrl(crawledUrl);
+          const { url: canonicalUrl, params } =
+            canonicalizeTargetUrl(crawledUrl);
           const existing = urlParamsMap.get(canonicalUrl) ?? [];
-          urlParamsMap.set(canonicalUrl, [...new Set([...existing, ...params])]);
+          urlParamsMap.set(canonicalUrl, [
+            ...new Set([...existing, ...params]),
+          ]);
         }
 
         for (const form of crawlResult.forms) {
@@ -210,15 +266,21 @@ export class ScanProcessor extends WorkerHost {
           } else if (param.source === 'form' && !param.formAction) {
             const { url: canonicalUrl } = canonicalizeTargetUrl(scan.url);
             const existing = urlParamsMap.get(canonicalUrl) ?? [];
-            urlParamsMap.set(canonicalUrl, [...new Set([...existing, param.name])]);
+            urlParamsMap.set(canonicalUrl, [
+              ...new Set([...existing, param.name]),
+            ]);
           } else if (param.source === 'fragment') {
             const { url: canonicalUrl } = canonicalizeTargetUrl(scan.url);
             const existing = urlParamsMap.get(canonicalUrl) ?? [];
-            urlParamsMap.set(canonicalUrl, [...new Set([...existing, param.name])]);
+            urlParamsMap.set(canonicalUrl, [
+              ...new Set([...existing, param.name]),
+            ]);
           } else if (param.source === 'query') {
             const { url: canonicalUrl } = canonicalizeTargetUrl(scan.url);
             const existing = urlParamsMap.get(canonicalUrl) ?? [];
-            urlParamsMap.set(canonicalUrl, [...new Set([...existing, param.name])]);
+            urlParamsMap.set(canonicalUrl, [
+              ...new Set([...existing, param.name]),
+            ]);
           }
         }
 
@@ -238,16 +300,33 @@ export class ScanProcessor extends WorkerHost {
         targetEntries.flatMap(([, params]) => params),
       ).size;
 
-      this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'CRAWL', message: `Crawled ${allCrawledUrls.length} URLs, ${totalUniqueParams} params, WAF: ${waf}, forms: ${crawledForms.length}`, details: { totalUrls: allCrawledUrls.length, totalParams: totalUniqueParams, waf, forms: crawledForms.length }, durationMs: Date.now() - crawlStartedAt });
+      this.scannerLog.append(scanId, {
+        timestamp: new Date().toISOString(),
+        phase: 'CRAWL',
+        message: `Crawled ${allCrawledUrls.length} URLs, ${totalUniqueParams} params, WAF: ${waf}, forms: ${crawledForms.length}`,
+        details: {
+          totalUrls: allCrawledUrls.length,
+          totalParams: totalUniqueParams,
+          waf,
+          forms: crawledForms.length,
+        },
+        durationMs: Date.now() - crawlStartedAt,
+      });
 
-      await this.scanService.addAuditLog(scanId, 'CRAWL', `Crawled target and discovered ${allCrawledUrls.length} URLs with ${totalUniqueParams} unique params`, {
-        totalUrls: allCrawledUrls.length,
-        totalParams: totalUniqueParams,
-        totalTargets: targetEntries.length,
-        formsFound: crawledForms.length,
-        wafDetected: waf,
-        urls: allCrawledUrls.slice(0, 50),
-      }, Date.now() - crawlStartedAt);
+      await this.scanService.addAuditLog(
+        scanId,
+        'CRAWL',
+        `Crawled target and discovered ${allCrawledUrls.length} URLs with ${totalUniqueParams} unique params`,
+        {
+          totalUrls: allCrawledUrls.length,
+          totalParams: totalUniqueParams,
+          totalTargets: targetEntries.length,
+          formsFound: crawledForms.length,
+          wafDetected: waf,
+          urls: allCrawledUrls.slice(0, 50),
+        },
+        Date.now() - crawlStartedAt,
+      );
 
       this.gateway.emitProgress({
         scanId,
@@ -260,10 +339,20 @@ export class ScanProcessor extends WorkerHost {
 
       if (targetEntries.length === 0) {
         this.logger.warn(`no parameterized URLs found for scanId=${scanId}`);
-        await this.scanService.updateStatus(scanId, ScanStatus.DONE, ScanPhase.REPORT, 100);
+        await this.scanService.updateStatus(
+          scanId,
+          ScanStatus.DONE,
+          ScanPhase.REPORT,
+          100,
+        );
         this.gateway.emitComplete({
           scanId,
-          summary: { totalParams: 0, paramsTested: 0, vulnsFound: 0, durationMs: Date.now() - startedAt },
+          summary: {
+            totalParams: 0,
+            paramsTested: 0,
+            vulnsFound: 0,
+            durationMs: Date.now() - startedAt,
+          },
           reportUrl: '',
         });
         return;
@@ -292,14 +381,26 @@ export class ScanProcessor extends WorkerHost {
         durationMs: 0,
       });
 
-      await this.scanService.updateStatus(scanId, ScanStatus.ANALYZING, ScanPhase.CONTEXT, 25);
+      await this.scanService.updateStatus(
+        scanId,
+        ScanStatus.ANALYZING,
+        ScanPhase.CONTEXT,
+        25,
+      );
 
       let totalPayloadsTested = 0;
       let totalVulnsFound = 0;
       const totalTargets = targetEntries.length;
 
-      const auditPayloadsByUrl: Record<string, { params: string[]; payloads: string[] }> = {};
-      const auditInjectionPoints: { url: string; param: string; method: string }[] = [];
+      const auditPayloadsByUrl: Record<
+        string,
+        { params: string[]; payloads: string[] }
+      > = {};
+      const auditInjectionPoints: {
+        url: string;
+        param: string;
+        method: string;
+      }[] = [];
 
       for (let i = 0; i < totalTargets; i++) {
         const [targetUrl, targetParams] = targetEntries[i];
@@ -309,7 +410,12 @@ export class ScanProcessor extends WorkerHost {
           timestamp: new Date().toISOString(),
           phase: 'CONTEXT',
           message: `[${i + 1}/${totalTargets}] Processing URL: ${targetUrl}`,
-          details: { url: targetUrl, params: targetParams, urlIndex: i, totalUrls: totalTargets },
+          details: {
+            url: targetUrl,
+            params: targetParams,
+            urlIndex: i,
+            totalUrls: totalTargets,
+          },
           durationMs: 0,
         });
 
@@ -323,12 +429,19 @@ export class ScanProcessor extends WorkerHost {
         );
 
         for (const param of targetParams) {
-          auditInjectionPoints.push({ url: targetUrl, param, method: 'URLSearchParams' });
+          auditInjectionPoints.push({
+            url: targetUrl,
+            param,
+            method: 'URLSearchParams',
+          });
         }
 
         if (targetParams.length === 0) {
           await this.scanService.updateStatus(
-            scanId, ScanStatus.FUZZING, ScanPhase.FUZZ, pct(0.5),
+            scanId,
+            ScanStatus.FUZZING,
+            ScanPhase.FUZZ,
+            pct(0.5),
           );
           this.gateway.emitProgress({
             scanId,
@@ -338,6 +451,8 @@ export class ScanProcessor extends WorkerHost {
           });
 
           let urlVulnCount = 0;
+          let domVulns: import('../modules-bridge/fuzzer-client.service').FuzzResult[] =
+            [];
           try {
             const domResp = await this.fuzzerClient.test(
               {
@@ -348,7 +463,7 @@ export class ScanProcessor extends WorkerHost {
               },
               authSession,
             );
-            const domVulns = domResp.results.filter((r) => r.vuln);
+            domVulns = domResp.results.filter((r) => r.vuln);
             for (const r of domVulns) {
               const vuln = this.reportService.buildVuln(scanId, targetUrl, r);
               if (await this.scanService.addVuln(scanId, vuln)) {
@@ -359,7 +474,129 @@ export class ScanProcessor extends WorkerHost {
             totalVulnsFound += domVulns.length;
           } catch (err) {
             const detail = err instanceof Error ? err.message : 'fuzzer error';
-            this.logger.warn(`dom-only scan failed for ${targetUrl}: ${detail}, skipping`);
+            this.logger.warn(
+              `dom-only scan failed for ${targetUrl}: ${detail}, skipping`,
+            );
+          }
+
+          // ── Fragment auto-discovery from DOM findings ──────────────
+          // When the DOM-only scan finds fragment-based XSS (evidence marks
+          // fragment_dependent = true), auto-generate __fragment__ payloads
+          // and dynamically verify them in the headless browser.
+          const fragmentDomVulns = domVulns.filter(
+            (r) => r.evidence?.fragment_dependent === true,
+          );
+
+          if (fragmentDomVulns.length > 0) {
+            const FRAGMENT_CHARS = [
+              '<',
+              '>',
+              '"',
+              "'",
+              '/',
+              '(',
+              ')',
+              ';',
+              '=',
+              '#',
+              ':',
+            ];
+
+            this.logger.log(
+              `fragment DOM XSS: ${fragmentDomVulns.length} findings on ${targetUrl}, generating fragment payloads`,
+            );
+
+            const fragmentContexts: Record<
+              string,
+              {
+                reflects_in: string;
+                allowed_chars: string[];
+                context_confidence: number;
+              }
+            > = {
+              __fragment__: {
+                reflects_in: 'attribute',
+                allowed_chars: FRAGMENT_CHARS,
+                context_confidence: 0.75,
+              },
+            };
+
+            let fragmentPayloads: GeneratedPayload[] = [];
+            try {
+              const genResp = await this.payloadClient.generate({
+                contexts: fragmentContexts,
+                waf,
+                maxPayloads: scan.options.maxPayloadsPerParam ?? 50,
+              });
+              fragmentPayloads = genResp.payloads;
+            } catch (err) {
+              const detail =
+                err instanceof Error ? err.message : 'payload-gen error';
+              this.logger.warn(
+                `fragment payload-gen failed for ${targetUrl}: ${detail}`,
+              );
+            }
+
+            // Inject template-breakout payloads for scenarios where the
+            // fragment value is concatenated into an existing HTML template
+            // before DOM injection (e.g. jQuery.html('<tag>' + frag + '</tag>')).
+            // Generic fragment payloads assume direct innerHTML assignment,
+            // but real apps often wrap the hash in a template first.
+            fragmentPayloads = [...FRAGMENT_BREAKOUT_PAYLOADS, ...fragmentPayloads];
+            this.logger.log(
+              `fragment payloads: ${fragmentPayloads.length} total (${FRAGMENT_BREAKOUT_PAYLOADS.length} template-breakout + ${fragmentPayloads.length - FRAGMENT_BREAKOUT_PAYLOADS.length} generic) for ${targetUrl}`,
+            );
+
+            if (fragmentPayloads.length > 0) {
+              this.gateway.emitProgress({
+                scanId,
+                phase: ScanPhase.FUZZ,
+                progress: pct(0.95),
+                message: `[${i + 1}/${totalTargets}] testing ${fragmentPayloads.length} fragment payloads on ${targetUrl}`,
+              });
+
+              try {
+                const fragResp = await this.fuzzerClient.test(
+                  {
+                    url: targetUrl,
+                    payloads: fragmentPayloads,
+                    verifyExecution: scan.options.verifyExecution ?? true,
+                    timeout: scan.options.timeout ?? 60000,
+                    context: 'attribute',
+                    waf,
+                    allowedChars: FRAGMENT_CHARS,
+                  },
+                  authSession,
+                );
+
+                const confirmedFragVulns = fragResp.results.filter(
+                  (r) => r.vuln,
+                );
+                totalPayloadsTested += fragmentPayloads.length;
+
+                for (const r of confirmedFragVulns) {
+                  const vuln = this.reportService.buildVuln(
+                    scanId,
+                    targetUrl,
+                    r,
+                  );
+                  if (await this.scanService.addVuln(scanId, vuln)) {
+                    this.gateway.emitFinding({ scanId, vuln });
+                  }
+                }
+                totalVulnsFound += confirmedFragVulns.length;
+
+                this.logger.log(
+                  `fragment XSS: ${confirmedFragVulns.length}/${fragmentPayloads.length} vulns confirmed on ${targetUrl}`,
+                );
+              } catch (err) {
+                const detail =
+                  err instanceof Error ? err.message : 'fuzzer error';
+                this.logger.warn(
+                  `fragment fuzzing failed for ${targetUrl}: ${detail}`,
+                );
+              }
+            }
           }
 
           const urlDurationMs = Date.now() - urlStartedAt;
@@ -390,7 +627,13 @@ export class ScanProcessor extends WorkerHost {
 
         // ── CONTEXT for this URL ────────────────────────────────────
         const contextStartedAt = Date.now();
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'CONTEXT', message: `Analyzing ${targetUrl} (${targetParams.length} params)`, details: { url: targetUrl, params: targetParams }, durationMs: 0 });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'CONTEXT',
+          message: `Analyzing ${targetUrl} (${targetParams.length} params)`,
+          details: { url: targetUrl, params: targetParams },
+          durationMs: 0,
+        });
         this.gateway.emitProgress({
           scanId,
           phase: ScanPhase.CONTEXT,
@@ -405,45 +648,105 @@ export class ScanProcessor extends WorkerHost {
             authSession,
           );
         } catch (err) {
-          const detail = err instanceof Error ? err.message : 'context module error';
-          this.logger.warn(`context failed for ${targetUrl}: ${detail}, skipping`);
-          await this.scanService.addAuditLog(scanId, 'CONTEXT', `Context analysis failed for ${targetUrl}: ${detail}`, {
-            url: targetUrl,
-            params: targetParams,
-            error: detail,
-          }, Date.now() - contextStartedAt);
+          const detail =
+            err instanceof Error ? err.message : 'context module error';
+          this.logger.warn(
+            `context failed for ${targetUrl}: ${detail}, skipping`,
+          );
+          await this.scanService.addAuditLog(
+            scanId,
+            'CONTEXT',
+            `Context analysis failed for ${targetUrl}: ${detail}`,
+            {
+              url: targetUrl,
+              params: targetParams,
+              error: detail,
+            },
+            Date.now() - contextStartedAt,
+          );
           continue;
         }
 
-        await this.scanService.addAuditLog(scanId, 'CONTEXT', `Context analyzed for ${targetUrl}, found ${Object.keys(contexts).length} contexts`, {
-          url: targetUrl,
-          contextsCount: Object.keys(contexts).length,
-          contexts,
-        }, Date.now() - contextStartedAt);
+        await this.scanService.addAuditLog(
+          scanId,
+          'CONTEXT',
+          `Context analyzed for ${targetUrl}, found ${Object.keys(contexts).length} contexts`,
+          {
+            url: targetUrl,
+            contextsCount: Object.keys(contexts).length,
+            contexts,
+          },
+          Date.now() - contextStartedAt,
+        );
 
         // Fragment param synthetic context injection
         const FRAGMENT_PARAM = '__fragment__';
-        const DEFAULT_FRAGMENT_CHARS = ['<', '>', '"', "'", '/', '(', ')', ';', '=', '#', ':'];
+        const DEFAULT_FRAGMENT_CHARS = [
+          '<',
+          '>',
+          '"',
+          "'",
+          '/',
+          '(',
+          ')',
+          ';',
+          '=',
+          '#',
+          ':',
+        ];
         for (const [paramName, ctx] of Object.entries(contexts)) {
           const ctxObj = ctx as { reflects_in: string };
-          if (paramName === FRAGMENT_PARAM && ctxObj.reflects_in === 'none') {
+          // The context module can never detect fragment reflection (server never
+          // sees the hash), so always upgrade __fragment__ to 'attribute' context.
+          // This ensures payload-gen targets attribute-breakout payloads instead
+          // of html_body payloads that can't exploit template-wrap scenarios.
+          if (paramName === FRAGMENT_PARAM) {
             (ctx as Record<string, unknown>).reflects_in = 'attribute';
-            (ctx as Record<string, unknown>).allowed_chars = DEFAULT_FRAGMENT_CHARS;
-            (ctx as Record<string, unknown>).context_confidence = 0.75;
+            (ctx as Record<string, unknown>).allowed_chars =
+              DEFAULT_FRAGMENT_CHARS;
+            (ctx as Record<string, unknown>).context_confidence = 0.85;
           }
         }
 
         const reflectedParams = Object.entries(contexts).filter(
-          ([, ctx]) =>
-            (ctx as { reflects_in: string }).reflects_in !== 'none',
+          ([, ctx]) => (ctx as { reflects_in: string }).reflects_in !== 'none',
         );
 
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'CONTEXT', message: `Context analyzed for ${targetUrl}: ${reflectedParams.length} reflecting contexts`, details: { url: targetUrl, contextsCount: Object.keys(contexts).length, reflectingParams: reflectedParams.length }, durationMs: Date.now() - contextStartedAt });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'CONTEXT',
+          message: `Context analyzed for ${targetUrl}: ${reflectedParams.length} reflecting contexts`,
+          details: {
+            url: targetUrl,
+            contextsCount: Object.keys(contexts).length,
+            reflectingParams: reflectedParams.length,
+          },
+          durationMs: Date.now() - contextStartedAt,
+        });
 
         if (reflectedParams.length === 0) {
           // ── Fallback: synthesize contexts for params that didn't reflect ──
-          const defaultChars = ['<', '>', '"', "'", '/', '(', ')', ';', '=', '#', ':'];
-          const syntheticContexts: Record<string, { reflects_in: string; allowed_chars: string[]; context_confidence: number }> = {};
+          const defaultChars = [
+            '<',
+            '>',
+            '"',
+            "'",
+            '/',
+            '(',
+            ')',
+            ';',
+            '=',
+            '#',
+            ':',
+          ];
+          const syntheticContexts: Record<
+            string,
+            {
+              reflects_in: string;
+              allowed_chars: string[];
+              context_confidence: number;
+            }
+          > = {};
           let fallbackVulnsCount = 0;
           let fallbackDomVulnsCount = 0;
           for (const param of targetParams) {
@@ -454,7 +757,9 @@ export class ScanProcessor extends WorkerHost {
             };
           }
 
-          this.logger.log(`no reflecting params found for ${targetUrl}, synthesizing ${targetParams.length} contexts for fallback fuzzing`);
+          this.logger.log(
+            `no reflecting params found for ${targetUrl}, synthesizing ${targetParams.length} contexts for fallback fuzzing`,
+          );
           this.gateway.emitProgress({
             scanId,
             phase: ScanPhase.PAYLOAD_GEN,
@@ -471,15 +776,18 @@ export class ScanProcessor extends WorkerHost {
             });
             fallbackPayloads = genResp.payloads;
           } catch (err) {
-            const detail = err instanceof Error ? err.message : 'payload-gen error';
-            this.logger.warn(`fallback payload-gen failed for ${targetUrl}: ${detail}`);
+            const detail =
+              err instanceof Error ? err.message : 'payload-gen error';
+            this.logger.warn(
+              `fallback payload-gen failed for ${targetUrl}: ${detail}`,
+            );
             fallbackPayloads = [];
           }
 
           const maxPerParam = scan.options.maxPayloadsPerParam ?? 50;
           const perParam = new Map<string, Set<string>>();
           const uniqueFallback: typeof fallbackPayloads = [];
-          for (const p of (fallbackPayloads ?? [])) {
+          for (const p of fallbackPayloads ?? []) {
             const paramKey = String(p.target_param ?? '');
             if (!perParam.has(paramKey)) perParam.set(paramKey, new Set());
             const seen = perParam.get(paramKey)!;
@@ -489,22 +797,49 @@ export class ScanProcessor extends WorkerHost {
             uniqueFallback.push(p);
           }
 
-          await this.scanService.addAuditLog(scanId, 'CONTEXT', `Fallback contexts synthesized for ${targetUrl}: ${uniqueFallback.length} fallback payloads`, {
-            url: targetUrl,
-            params: targetParams,
-            fallbackPayloads: uniqueFallback.length,
-          }, Date.now() - contextStartedAt);
+          await this.scanService.addAuditLog(
+            scanId,
+            'CONTEXT',
+            `Fallback contexts synthesized for ${targetUrl}: ${uniqueFallback.length} fallback payloads`,
+            {
+              url: targetUrl,
+              params: targetParams,
+              fallbackPayloads: uniqueFallback.length,
+            },
+            Date.now() - contextStartedAt,
+          );
+
+          // ── Inject template-breakout payloads for __fragment__ in fallback ──
+          if (targetParams.includes('__fragment__')) {
+            const existing = new Set(uniqueFallback.map(p => `${p.target_param}:${p.payload}`));
+            const toInject = FRAGMENT_BREAKOUT_PAYLOADS.filter(bp => !existing.has(`${bp.target_param}:${bp.payload}`));
+            uniqueFallback.unshift(...toInject);
+            this.logger.log(
+              `fragment fallback: injected ${toInject.length} template-breakout payloads for ${targetUrl}`,
+            );
+          }
 
           if (uniqueFallback.length > 0) {
             auditPayloadsByUrl[targetUrl] = {
               params: targetParams,
-              payloads: uniqueFallback.map((p) => `${p.target_param}=${p.payload}`),
+              payloads: uniqueFallback.map(
+                (p) => `${p.target_param}=${p.payload}`,
+              ),
             };
 
-            this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'PAYLOAD_GEN', message: `Fallback: generated ${uniqueFallback.length} payloads for ${targetUrl}`, details: { url: targetUrl, totalPayloads: uniqueFallback.length }, durationMs: Date.now() - contextStartedAt });
+            this.scannerLog.append(scanId, {
+              timestamp: new Date().toISOString(),
+              phase: 'PAYLOAD_GEN',
+              message: `Fallback: generated ${uniqueFallback.length} payloads for ${targetUrl}`,
+              details: { url: targetUrl, totalPayloads: uniqueFallback.length },
+              durationMs: Date.now() - contextStartedAt,
+            });
 
             await this.scanService.updateStatus(
-              scanId, ScanStatus.FUZZING, ScanPhase.FUZZ, pct(0.66),
+              scanId,
+              ScanStatus.FUZZING,
+              ScanPhase.FUZZ,
+              pct(0.66),
             );
             this.gateway.emitProgress({
               scanId,
@@ -537,10 +872,23 @@ export class ScanProcessor extends WorkerHost {
               }
               totalVulnsFound += fuzzVulns.length;
 
-              this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'FUZZ', message: `Fallback fuzzing: ${fuzzVulns.length} vulns on ${targetUrl}`, details: { url: targetUrl, payloadsTested: uniqueFallback.length, vulnsFound: fuzzVulns.length }, durationMs: Date.now() - contextStartedAt });
+              this.scannerLog.append(scanId, {
+                timestamp: new Date().toISOString(),
+                phase: 'FUZZ',
+                message: `Fallback fuzzing: ${fuzzVulns.length} vulns on ${targetUrl}`,
+                details: {
+                  url: targetUrl,
+                  payloadsTested: uniqueFallback.length,
+                  vulnsFound: fuzzVulns.length,
+                },
+                durationMs: Date.now() - contextStartedAt,
+              });
             } catch (err) {
-              const detail = err instanceof Error ? err.message : 'fuzzer error';
-              this.logger.warn(`fallback fuzzing failed for ${targetUrl}: ${detail}, falling back to DOM-only`);
+              const detail =
+                err instanceof Error ? err.message : 'fuzzer error';
+              this.logger.warn(
+                `fallback fuzzing failed for ${targetUrl}: ${detail}, falling back to DOM-only`,
+              );
             }
           }
 
@@ -573,7 +921,9 @@ export class ScanProcessor extends WorkerHost {
             totalVulnsFound += domVulns.length;
           } catch (err) {
             const detail = err instanceof Error ? err.message : 'fuzzer error';
-            this.logger.warn(`dom-only scan failed for ${targetUrl}: ${detail}, skipping`);
+            this.logger.warn(
+              `dom-only scan failed for ${targetUrl}: ${detail}, skipping`,
+            );
           }
 
           const totalUrlVulns = fallbackVulnsCount + fallbackDomVulnsCount;
@@ -610,9 +960,18 @@ export class ScanProcessor extends WorkerHost {
 
         // ── PAYLOAD-GEN for this URL ────────────────────────────────
         const payloadGenStartedAt = Date.now();
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'PAYLOAD_GEN', message: `Generating payloads for ${targetUrl}`, details: { url: targetUrl, reflectingParams: reflectedParams.length }, durationMs: 0 });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'PAYLOAD_GEN',
+          message: `Generating payloads for ${targetUrl}`,
+          details: { url: targetUrl, reflectingParams: reflectedParams.length },
+          durationMs: 0,
+        });
         await this.scanService.updateStatus(
-          scanId, ScanStatus.GENERATING, ScanPhase.PAYLOAD_GEN, pct(0.33),
+          scanId,
+          ScanStatus.GENERATING,
+          ScanPhase.PAYLOAD_GEN,
+          pct(0.33),
         );
         this.gateway.emitProgress({
           scanId,
@@ -630,13 +989,22 @@ export class ScanProcessor extends WorkerHost {
           });
           payloads = genResp.payloads;
         } catch (err) {
-          const detail = err instanceof Error ? err.message : 'payload-gen error';
-          this.logger.warn(`payload-gen failed for ${targetUrl}: ${detail}, skipping`);
-          await this.scanService.addAuditLog(scanId, 'PAYLOAD_GEN', `Payload generation failed for ${targetUrl}: ${detail}`, {
-            url: targetUrl,
-            params: targetParams,
-            error: detail,
-          }, Date.now() - payloadGenStartedAt);
+          const detail =
+            err instanceof Error ? err.message : 'payload-gen error';
+          this.logger.warn(
+            `payload-gen failed for ${targetUrl}: ${detail}, skipping`,
+          );
+          await this.scanService.addAuditLog(
+            scanId,
+            'PAYLOAD_GEN',
+            `Payload generation failed for ${targetUrl}: ${detail}`,
+            {
+              url: targetUrl,
+              params: targetParams,
+              error: detail,
+            },
+            Date.now() - payloadGenStartedAt,
+          );
           continue;
         }
 
@@ -661,21 +1029,61 @@ export class ScanProcessor extends WorkerHost {
           payloads: uniquePayloads.map((p) => `${p.target_param}=${p.payload}`),
         };
 
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'PAYLOAD_GEN', message: `Generated ${uniquePayloads.length} unique payloads for ${targetUrl}`, details: { url: targetUrl, totalPayloads: payloads.length, uniquePayloads: uniquePayloads.length }, durationMs: Date.now() - payloadGenStartedAt });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'PAYLOAD_GEN',
+          message: `Generated ${uniquePayloads.length} unique payloads for ${targetUrl}`,
+          details: {
+            url: targetUrl,
+            totalPayloads: payloads.length,
+            uniquePayloads: uniquePayloads.length,
+          },
+          durationMs: Date.now() - payloadGenStartedAt,
+        });
 
-        await this.scanService.addAuditLog(scanId, 'PAYLOAD_GEN', `Generated ${uniquePayloads.length} unique payloads for ${targetUrl} (${targetParams.length} params)`, {
-          url: targetUrl,
-          params: targetParams,
-          totalPayloads: payloads.length,
-          uniquePayloads: uniquePayloads.length,
-          payloadSamples: uniquePayloads.slice(0, 10).map((p) => ({ param: p.target_param, payload: p.payload })),
-        }, Date.now() - payloadGenStartedAt);
+        await this.scanService.addAuditLog(
+          scanId,
+          'PAYLOAD_GEN',
+          `Generated ${uniquePayloads.length} unique payloads for ${targetUrl} (${targetParams.length} params)`,
+          {
+            url: targetUrl,
+            params: targetParams,
+            totalPayloads: payloads.length,
+            uniquePayloads: uniquePayloads.length,
+            payloadSamples: uniquePayloads
+              .slice(0, 10)
+              .map((p) => ({ param: p.target_param, payload: p.payload })),
+          },
+          Date.now() - payloadGenStartedAt,
+        );
+
+        // ── Inject template-breakout payloads for __fragment__ ─────
+        // When __fragment__ is a discovered param, prepend breakout payloads
+        // designed for template-wrap scenarios (e.g. `attr="prefix"+hash+"suffix"`)
+        // that generic html_body payloads cannot exploit.
+        if (targetParams.includes('__fragment__')) {
+          const existing = new Set(uniquePayloads.map(p => `${p.target_param}:${p.payload}`));
+          const toInject = FRAGMENT_BREAKOUT_PAYLOADS.filter(bp => !existing.has(`${bp.target_param}:${bp.payload}`));
+          uniquePayloads.unshift(...toInject);
+          this.logger.log(
+            `fragment: injected ${toInject.length} template-breakout payloads for ${targetUrl}`,
+          );
+        }
 
         // ── FUZZ for this URL ───────────────────────────────────────
         const fuzzStartedAt = Date.now();
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'FUZZ', message: `Fuzzing ${targetUrl} with ${uniquePayloads.length} payloads`, details: { url: targetUrl, payloadCount: uniquePayloads.length }, durationMs: 0 });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'FUZZ',
+          message: `Fuzzing ${targetUrl} with ${uniquePayloads.length} payloads`,
+          details: { url: targetUrl, payloadCount: uniquePayloads.length },
+          durationMs: 0,
+        });
         await this.scanService.updateStatus(
-          scanId, ScanStatus.FUZZING, ScanPhase.FUZZ, pct(0.66),
+          scanId,
+          ScanStatus.FUZZING,
+          ScanPhase.FUZZ,
+          pct(0.66),
         );
         this.gateway.emitProgress({
           scanId,
@@ -690,12 +1098,17 @@ export class ScanProcessor extends WorkerHost {
         try {
           const contextEntries = Object.values(contexts) as Array<{
             reflects_in: string;
-            allowed_chars?: string[];
+            allowed_chars: string[];
+            context_confidence: number;
           }>;
           const dominantContext =
-            contextEntries.length > 0 ? contextEntries[0].reflects_in : undefined;
+            contextEntries.length > 0
+              ? contextEntries[0].reflects_in
+              : undefined;
           const dominantAllowedChars =
-            contextEntries.length > 0 ? contextEntries[0].allowed_chars : undefined;
+            contextEntries.length > 0
+              ? contextEntries[0].allowed_chars
+              : undefined;
 
           const fuzzResp = await this.fuzzerClient.test(
             {
@@ -712,11 +1125,19 @@ export class ScanProcessor extends WorkerHost {
           results = fuzzResp.results;
         } catch (err) {
           const detail = err instanceof Error ? err.message : 'fuzzer error';
-          this.logger.warn(`fuzzer failed for ${targetUrl}: ${detail}, skipping`);
-          await this.scanService.addAuditLog(scanId, 'FUZZ', `Fuzzing failed for ${targetUrl}: ${detail}`, {
-            url: targetUrl,
-            error: detail,
-          }, Date.now() - fuzzStartedAt);
+          this.logger.warn(
+            `fuzzer failed for ${targetUrl}: ${detail}, skipping`,
+          );
+          await this.scanService.addAuditLog(
+            scanId,
+            'FUZZ',
+            `Fuzzing failed for ${targetUrl}: ${detail}`,
+            {
+              url: targetUrl,
+              error: detail,
+            },
+            Date.now() - fuzzStartedAt,
+          );
           continue;
         }
 
@@ -732,14 +1153,30 @@ export class ScanProcessor extends WorkerHost {
         }
         totalVulnsFound += confirmedVulns.length;
 
-        this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'FUZZ', message: `Tested ${uniquePayloads.length} payloads on ${targetUrl}: ${confirmedVulns.length} vulns`, details: { url: targetUrl, payloadsTested: uniquePayloads.length, vulnsFound: confirmedVulns.length }, durationMs: Date.now() - fuzzStartedAt });
+        this.scannerLog.append(scanId, {
+          timestamp: new Date().toISOString(),
+          phase: 'FUZZ',
+          message: `Tested ${uniquePayloads.length} payloads on ${targetUrl}: ${confirmedVulns.length} vulns`,
+          details: {
+            url: targetUrl,
+            payloadsTested: uniquePayloads.length,
+            vulnsFound: confirmedVulns.length,
+          },
+          durationMs: Date.now() - fuzzStartedAt,
+        });
 
-        await this.scanService.addAuditLog(scanId, 'FUZZ', `Tested ${uniquePayloads.length} payloads on ${targetUrl}, found ${confirmedVulns.length} vulnerabilities`, {
-          url: targetUrl,
-          payloadsTested: uniquePayloads.length,
-          vulnsFound: confirmedVulns.length,
-          uniqueVulnsAdded: urlVulnCount,
-        }, Date.now() - fuzzStartedAt);
+        await this.scanService.addAuditLog(
+          scanId,
+          'FUZZ',
+          `Tested ${uniquePayloads.length} payloads on ${targetUrl}, found ${confirmedVulns.length} vulnerabilities`,
+          {
+            url: targetUrl,
+            payloadsTested: uniquePayloads.length,
+            vulnsFound: confirmedVulns.length,
+            uniqueVulnsAdded: urlVulnCount,
+          },
+          Date.now() - fuzzStartedAt,
+        );
 
         this.gateway.emitProgress({
           scanId,
@@ -770,7 +1207,12 @@ export class ScanProcessor extends WorkerHost {
 
       // ── Stored XSS sub-pipeline ─────────────────────────────────────
       const SKIP_FIELDS = new Set([
-        'csrf', '_csrf', 'token', '_token', 'captcha', '__RequestVerificationToken',
+        'csrf',
+        '_csrf',
+        'token',
+        '_token',
+        'captcha',
+        '__RequestVerificationToken',
       ]);
       const storedForms = crawledForms.filter(
         (f) => f.sourceUrl && f.fields.length > 0,
@@ -782,11 +1224,20 @@ export class ScanProcessor extends WorkerHost {
           timestamp: new Date().toISOString(),
           phase: 'FUZZ',
           message: `Processing ${storedForms.length} form(s) for stored XSS`,
-          details: { formCount: storedForms.length, forms: storedForms.map((f) => ({ sourceUrl: f.sourceUrl, action: f.action, fields: f.fields })) },
+          details: {
+            formCount: storedForms.length,
+            forms: storedForms.map((f) => ({
+              sourceUrl: f.sourceUrl,
+              action: f.action,
+              fields: f.fields,
+            })),
+          },
           durationMs: 0,
         });
 
-        this.logger.log(`found ${storedForms.length} stored XSS form candidate(s)`);
+        this.logger.log(
+          `found ${storedForms.length} stored XSS form candidate(s)`,
+        );
         this.gateway.emitProgress({
           scanId,
           phase: ScanPhase.FUZZ,
@@ -811,14 +1262,25 @@ export class ScanProcessor extends WorkerHost {
             const fl = field.toLowerCase();
             if (fl.includes('email')) defaultFields[field] = 'test@test.com';
             else if (fl.includes('name')) defaultFields[field] = 'testuser';
-            else if (fl.includes('website') || fl.includes('url') || fl.includes('homepage'))
+            else if (
+              fl.includes('website') ||
+              fl.includes('url') ||
+              fl.includes('homepage')
+            )
               defaultFields[field] = 'http://test.com';
             else if (fl.includes('postid') || fl.includes('post_id'))
               defaultFields[field] = this.extractPostId(displayUrl) ?? '1';
             else defaultFields[field] = 'test input';
           }
 
-          const storedContexts: Record<string, { reflects_in: string; allowed_chars: string[]; context_confidence: number }> = {};
+          const storedContexts: Record<
+            string,
+            {
+              reflects_in: string;
+              allowed_chars: string[];
+              context_confidence: number;
+            }
+          > = {};
           for (const field of testableFields) {
             storedContexts[field] = {
               reflects_in: 'html_body',
@@ -836,8 +1298,11 @@ export class ScanProcessor extends WorkerHost {
             });
             storedPayloads = genResp.payloads;
           } catch (err) {
-            const detail = err instanceof Error ? err.message : 'payload-gen error';
-            this.logger.warn(`stored XSS payload-gen failed: ${detail}, skipping`);
+            const detail =
+              err instanceof Error ? err.message : 'payload-gen error';
+            this.logger.warn(
+              `stored XSS payload-gen failed: ${detail}, skipping`,
+            );
             continue;
           }
 
@@ -908,14 +1373,27 @@ export class ScanProcessor extends WorkerHost {
           timestamp: new Date().toISOString(),
           phase: 'FUZZ',
           message: `Stored XSS form processing complete: ${storedForms.length} form(s) processed`,
-          details: { formCount: storedForms.length, totalPayloadsUsed: totalPayloadsTested },
+          details: {
+            formCount: storedForms.length,
+            totalPayloadsUsed: totalPayloadsTested,
+          },
           durationMs: Date.now() - storedFormsStartedAt,
         });
       }
 
       // ── Phase 5: REPORT ─────────────────────────────────────────────
-      this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'REPORT', message: 'Generating report', durationMs: 0 });
-      await this.scanService.updateStatus(scanId, ScanStatus.REPORTING, ScanPhase.REPORT, 90);
+      this.scannerLog.append(scanId, {
+        timestamp: new Date().toISOString(),
+        phase: 'REPORT',
+        message: 'Generating report',
+        durationMs: 0,
+      });
+      await this.scanService.updateStatus(
+        scanId,
+        ScanStatus.REPORTING,
+        ScanPhase.REPORT,
+        90,
+      );
       const vulns = await this.scanService.getVulns(scanId);
       const completedAt = new Date();
       const scanForReport = { ...scan, completedAt };
@@ -923,7 +1401,10 @@ export class ScanProcessor extends WorkerHost {
       const auditLogs = await this.scanService.getAuditLogs(scanId);
 
       const totalPayloadsGenerated = auditPayloadsByUrl
-        ? Object.values(auditPayloadsByUrl).reduce((sum, entry) => sum + entry.payloads.length, 0)
+        ? Object.values(auditPayloadsByUrl).reduce(
+            (sum, entry) => sum + entry.payloads.length,
+            0,
+          )
         : totalPayloadsTested;
 
       const reportUrl = await this.reportService.generate(
@@ -942,15 +1423,26 @@ export class ScanProcessor extends WorkerHost {
         },
       );
 
-      await this.scanService.addAuditLog(scanId, 'REPORT', `Report generated for ${totalTargets} target(s) with ${vulns.length} vulnerabilities found`, {
-        totalTargets,
-        totalPayloadsGenerated,
-        totalVulns: vulns.length,
-        durationMs: Date.now() - startedAt,
-        reportUrl,
-      }, Date.now() - startedAt);
+      await this.scanService.addAuditLog(
+        scanId,
+        'REPORT',
+        `Report generated for ${totalTargets} target(s) with ${vulns.length} vulnerabilities found`,
+        {
+          totalTargets,
+          totalPayloadsGenerated,
+          totalVulns: vulns.length,
+          durationMs: Date.now() - startedAt,
+          reportUrl,
+        },
+        Date.now() - startedAt,
+      );
 
-      await this.scanService.updateStatus(scanId, ScanStatus.DONE, ScanPhase.REPORT, 100);
+      await this.scanService.updateStatus(
+        scanId,
+        ScanStatus.DONE,
+        ScanPhase.REPORT,
+        100,
+      );
 
       const durationMs = Date.now() - startedAt;
       this.gateway.emitComplete({
@@ -964,7 +1456,17 @@ export class ScanProcessor extends WorkerHost {
         reportUrl,
       });
 
-      this.scannerLog.append(scanId, { timestamp: new Date().toISOString(), phase: 'REPORT', message: `Scan complete: ${totalTargets} target(s), ${totalPayloadsTested} payloads tested, ${vulns.length} vulns found in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`, details: { totalTargets, totalPayloadsTested, totalVulns: vulns.length, durationMs } });
+      this.scannerLog.append(scanId, {
+        timestamp: new Date().toISOString(),
+        phase: 'REPORT',
+        message: `Scan complete: ${totalTargets} target(s), ${totalPayloadsTested} payloads tested, ${vulns.length} vulns found in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
+        details: {
+          totalTargets,
+          totalPayloadsTested,
+          totalVulns: vulns.length,
+          durationMs,
+        },
+      });
       this.scannerLog.flush(scanId, {
         targetUrl: scan.url,
         startedAt: new Date(startedAt),
@@ -980,7 +1482,13 @@ export class ScanProcessor extends WorkerHost {
       const msg: string = err instanceof Error ? err.message : 'unknown error';
       this.logger.error(`scan failed scanId=${scanId} error=${msg}`);
       await this.scanService.markFailed(scanId, msg);
-      await this.scanService.addAuditLog(scanId, 'FAIL', `Scan failed: ${msg}`, { error: msg }, Date.now() - startedAt);
+      await this.scanService.addAuditLog(
+        scanId,
+        'FAIL',
+        `Scan failed: ${msg}`,
+        { error: msg },
+        Date.now() - startedAt,
+      );
       this.scannerLog.flush(scanId, {
         targetUrl: scanId,
         startedAt: new Date(startedAt),
