@@ -1,0 +1,105 @@
+{
+  "_meta": {
+    "name": "OWASP Benchmark",
+    "description": "OWASP Benchmark — vulnerability detection benchmark with known ground truth labels",
+    "image": "owasp/benchmark:latest",
+    "port": 8443,
+    "target_url": "https://localhost:8443",
+    "category": "benchmark",
+    "auth_required": false,
+    "protocol": "https",
+    "tls_verify": false,
+    "notes": "OWASP Benchmark is a Java-based test suite with ~2,740 test cases, each labeled Vulnerable or Safe. The benchmark measures detection tool accuracy. XSS test cases use endpoints like /benchmark/BenchmarkTestXXXXX. Each test case reflects input in a specific context. We test a representative subset.",
+    "test_case_count": 2740,
+    "xss_test_count": 212
+  },
+  "endpoints": [
+    {
+      "name": "benchmark-xss-001",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00013.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00013"],
+      "expected": "Vuln",
+      "stored_mode": false,
+      "notes": "XSS test case from Benchmark xss-00 directory (test 00013)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00013", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00013", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<svg onload=alert(1)>", "target_param": "BenchmarkTest00013", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    },
+    {
+      "name": "benchmark-xss-002",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00014.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00014"],
+      "expected": "Vuln",
+      "stored_mode": false,
+      "notes": "XSS test case from Benchmark xss-00 directory (test 00014)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00014", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00014", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<svg onload=alert(1)>", "target_param": "BenchmarkTest00014", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    },
+    {
+      "name": "benchmark-xss-003",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00030.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00030"],
+      "expected": "Vuln",
+      "stored_mode": false,
+      "notes": "XSS test case from Benchmark xss-00 directory (test 00030)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00030", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00030", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<svg onload=alert(1)>", "target_param": "BenchmarkTest00030", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    },
+    {
+      "name": "benchmark-safe-001",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00036.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00036"],
+      "expected": "Safe",
+      "stored_mode": false,
+      "notes": "Safe test case from Benchmark xss-00 (test 00036 — no detected reflection)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00036", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00036", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    },
+    {
+      "name": "benchmark-safe-002",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00041.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00041"],
+      "expected": "Safe",
+      "stored_mode": false,
+      "notes": "Safe test case from Benchmark xss-00 (test 00041 — no detected reflection)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00041", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00041", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    },
+    {
+      "name": "benchmark-safe-003",
+      "category": "Benchmark",
+      "url": "https://localhost:8443/benchmark/xss-00/BenchmarkTest00047.html",
+      "method": "GET",
+      "params": ["BenchmarkTest00047"],
+      "expected": "Safe",
+      "stored_mode": false,
+      "notes": "Safe test case from Benchmark xss-00 (test 00047 — no detected reflection)",
+      "payloads": [
+        {"payload": "<script>alert(1)</script>", "target_param": "BenchmarkTest00047", "confidence": 1.0, "technique": "original", "severity": "medium"},
+        {"payload": "<img src=x onerror=alert(1)>", "target_param": "BenchmarkTest00047", "confidence": 1.0, "technique": "original", "severity": "medium"}
+      ]
+    }
+  ]
+}
