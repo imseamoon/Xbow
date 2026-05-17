@@ -24,6 +24,94 @@ Large checkpoint binaries under `model/checkpoints/*.pt` are intentionally ignor
 
 ---
 
+## Validation vs Test Discrepancy
+
+`model/checkpoints/metrics.json` reports validation metrics logged during training on the val set (`dataset/processed/splits_from_ranker/val.csv`). `model/checkpoints/test_results.json` reports evaluation metrics on a held-out test set.
+
+| Metric | Validation | Test (old, stale) | Test (current, clean) |
+| -------- | -----------: | -----------------: | ----------------------: |
+| Context accuracy | ~75.1% | 99.53% | **78.4%** |
+| Severity accuracy | ~35.4% | 99.56% | **38.2%** |
+| Samples | 489 | 3,632 | **306** |
+
+**✅ The discrepancy is now resolved.** With clean splits and regenerated `test_results.json`, the test metrics (78.4% context, 38.2% severity) are consistent with the validation metrics (75.1% / 35.4%). The remaining gap is explained by the model's inherent performance and label quality, not by data leakage.
+
+The old results (99.53%/99.56% on 3,632 samples) were inflated by data leakage — 78% of test payloads appeared in training, so the test measured memorization rather than generalization.
+
+### 1. Sample-count resolved
+
+The current test split (`splits_from_ranker/test.csv`) has 421 data rows (82 unique payloads). After filtering for known labels, the evaluation loads **306 valid test samples**. This is consistent with the split size.
+
+The old `test_results.json` reported 3,632 samples — it was generated from a different, larger test set. It has now been **regenerated** (2026-03-13) with the current clean splits.
+
+### 2. Massive data leakage in current splits
+
+> **Historical analysis (original splits, before regeneration).** Current splits have **zero** payload overlap — see Action #1 below.
+
+The original splits under `splits_from_ranker/` had severe payload overlap between sets:
+
+| Overlap type | Train-Val | Train-Test |
+|---|---|---|
+| Duplicate payloads (exact) | 83.1% | 78.2% |
+| Duplicate (payload, context) pairs | 64.4% | 57.7% |
+| Duplicate (payload, context, severity) triples | 53.4% | 52.5% |
+| Near-duplicate (normalized) test payloads in train | — | 83.4% |
+
+**161 of 206 unique test payloads (78%) appear in the training set.** 422 of 471 test rows use payloads already seen during training. Even test payloads with novel normalized forms retain ~0.91 average string similarity to their closest training match. This means the test set largely tests *memorization* rather than *generalization*. The model can predict test labels by recalling the most common label assigned to each payload during training, rather than learning to infer context from syntactic features.
+
+### 3. Label noise in validation set (severity)
+
+> **Historical analysis.** The old (stale) test set claimed 99.56% severity accuracy, but the current clean test set shows **38.2%**, consistent with validation's ~35.4%.
+
+Severity accuracy peaks at only ~35% during validation (and ~38% on the clean test set), well below the context accuracy. Possible causes:
+- Severity labels in the dataset are noisy or inconsistent
+- The model has not learned to predict severity from payload syntax alone (severity is often context-dependent and requires runtime evidence)
+- Severity labels were assigned by different heuristics for different portions of the data (e.g., automated rules vs manual labeling)
+
+### 4. Synthetic test data predictability
+
+> **Historical analysis.** The 83.4% normalized overlap and the inflated test scores were artifacts of the original overlapping splits. With zero-overlap splits, the current test set (78.4% context, 38.2% severity) reflects genuine model generalization.
+
+Test payloads tend to show stereotyped syntax-to-context mappings (e.g., `{{7*7}}` → `template_injection`, `<svg/onload=...>` → `tag_injection`). If these patterns were trivially repeated across splits, the test would be artificially easy — the original overlapping splits confirmed this (83.4% normalized overlap). With clean splits, the model's 78% context accuracy on unfamiliar payloads is a realistic estimate of generalization performance.
+
+### 5. Different checkpoint possibilities
+
+`metrics.json` logs metrics **during training** using the latest model state after each epoch. The best model is saved as `best.pt`. If `test_results.json` was generated from a different checkpoint (e.g., `latest.pt` after more training, or an older `best.pt` from a different training run), the results would differ. The checkpoint metadata in `test_results.json` does not record which checkpoint was used.
+
+### 6. Label task consistency
+
+Both files use the same label taxonomy (8 context classes, 3 severity classes defined in `config.py`). However, the validation metrics show per-class accuracy varying widely — some classes may have very few or zero validation examples, making aggregate metrics misleading. The test results do not report per-class accuracy, making it impossible to verify whether the high scores are uniform or driven by dominant classes.
+
+### Data-leakage checks
+
+**Before regeneration (historical):**
+
+| Check | Result |
+|-------|--------|
+| Exact duplicate payloads across train/test | **78.2%** of test payloads seen in train |
+| Exact duplicate triples across train/test | **52.5%** of test triples seen in train |
+| Near-duplicate (normalized) test payloads in train | **83.4%** |
+| Average string similarity of novel test payloads to train | **0.907** |
+| Same source pages across train/test | Cannot determine — no source-page metadata in splits |
+
+**After regeneration (current state):**
+
+| Check | Result |
+|-------|--------|
+| Exact duplicate payloads across train/val/test | **0** — zero overlap across all split pairs |
+| Same source pages across train/test | Cannot determine — no source-page metadata in splits |
+
+### Recommended Actions
+
+1. ✅ **Regenerated clean splits** (2026-03-13) — zero payload overlap between train/val/test. Strategy: grouped all rows by unique payload, split payloads 70/15/15 stratified by dominant context label, then assigned all rows for a given payload to the same split. Results: **0** duplicate payloads across all pairs.
+2. ✅ **Re-ran evaluation** (2026-03-13) — `test_results.json` updated with clean splits using checkpoint `best.pt`. Results are consistent with validation metrics.
+3. **Investigate severity labels** — 35% validation accuracy suggests label quality issues requiring manual audit.
+4. **Add data-leakage checks** to the dataset pipeline (e.g., in `scripts/dataset_stats.py` or a standalone validation script).
+5. ✅ **Per-class metrics are now available** via confusion matrix and error breakdown in `test_results.json`. Could be further structured into a dedicated per-class metrics table in the JSON output.
+6. **Record evaluation metadata** in `test_results.json`: checkpoint path, config used, timestamp.
+
+---
+
 ## Dataset Pipeline
 
 The dataset pipeline is automated via the project Makefile. See `dataset/README.md` for full details.
