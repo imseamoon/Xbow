@@ -46,7 +46,7 @@ $ENV_COMMON = @(
     "CONTEXT_URL=http://localhost:5001",
     "PAYLOAD_GEN_URL=http://localhost:5002",
     "FUZZER_URL=http://localhost:5003",
-    "DATABASE_URL=postgresql://rs:rs@localhost:5432/redsentinel",
+    "DATABASE_URL=postgresql://rs:65432one@localhost:5432/redsentinel",
     "NODE_ENV=development"
 )
 
@@ -56,6 +56,9 @@ foreach ($e in $ENV_COMMON) {
     $parts = $e -split '=', 2
     $envPrefix += "`$env:$($parts[0])='$($parts[1])'; "
 }
+
+# Add PostgreSQL and Redis bin directories to PATH so pg_isready, psql, redis-cli etc. are available
+$envPrefix += "`$env:Path = 'C:\Program Files\PostgreSQL\17\bin;' + `$env:Path; "
 
 function Start-ServiceWindow {
     param(
@@ -100,7 +103,8 @@ Write-Host "  [..] Stopping any previous instances..." -ForegroundColor Cyan
 Start-Sleep -Seconds 2
 
 # 1 — Redis
-Start-ServiceWindow -Title "Redis :6379" -Command "redis-server" -Minimized
+$redisCmd = "redis-cli ping 2>`$null; if (`$LASTEXITCODE -ne 0) { Write-Host 'Redis not running - start it manually (e.g. redis-server)'; } else { Write-Host 'Redis is running' -ForegroundColor Green }; while (`$true) { Start-Sleep -Seconds 30; redis-cli ping > `$null 2>&1 }"
+Start-ServiceWindow -Title "Redis :6379" -Command $redisCmd -Minimized
 
 # 2 — PostgreSQL
 $pgCmd = "pg_isready -h localhost 2>`$null; if (`$LASTEXITCODE -ne 0) { Write-Host 'PostgreSQL not running - start from Services.msc'; } while (`$true) { Start-Sleep -Seconds 30; pg_isready -h localhost }"

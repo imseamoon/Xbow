@@ -59,7 +59,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 ok "pip available"
 
-# PostgreSQL
+# PostgreSQL — add bin directory to PATH so pg_isready, psql etc. are found
+$env:Path = "C:\Program Files\PostgreSQL\17\bin;" + $env:Path
 $pgReady = Get-Command pg_isready -ErrorAction SilentlyContinue
 if (-not $pgReady) {
     warn "pg_isready not found - ensure PostgreSQL is installed (https://www.postgresql.org/download/windows/)"
@@ -215,7 +216,7 @@ if ($pgReady) {
 if ($PG_SETUP) {
     info "Running database migrations..."
     Push-Location "$ROOT\core"
-    $env:DATABASE_URL = "postgresql://rs:rs@localhost:5432/redsentinel"
+    $env:DATABASE_URL = "postgresql://rs:65432one@localhost:5432/redsentinel"
     npm run migration:run 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         warn "Migrations failed - you can run them later with: cd core && npm run migration:run"
