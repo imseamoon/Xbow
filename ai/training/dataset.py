@@ -2,6 +2,15 @@
 """
 RedSentinel AI — Dataset & DataLoader
 Loads CSV splits, tokenizes with DistilBERT tokenizer, returns PyTorch datasets.
+
+Device-aware data loading:
+  - CUDA (NVIDIA):    num_workers=2 for parallel data loading.
+  - MPS  (Apple Si):  num_workers=0 to avoid multiprocessing
+                       compatibility issues with the Metal backend.
+  - CPU  (fallback):  num_workers=0 (no benefit without GPU).
+
+The data itself stays on CPU tensors; the training loop moves
+batches to DEVICE via ``.to(DEVICE)``.
 """
 
 import pandas as pd
@@ -12,7 +21,7 @@ from pathlib import Path
 from typing import Tuple
 
 from config import (
-    TRAIN_FILE, VAL_FILE, TEST_FILE,
+    DEVICE, TRAIN_FILE, VAL_FILE, TEST_FILE,
     DISTILBERT_MODEL_NAME, MAX_LENGTH,
     CONTEXT_LABELS, SEVERITY_LABELS,
     BATCH_SIZE
@@ -87,9 +96,29 @@ class XSSDataset(Dataset):
 
 
 def get_dataloaders(batch_size: int = BATCH_SIZE) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """Create train, val, test DataLoaders."""
+    """Create train, val, test DataLoaders with device-aware worker counts.
+
+    Multi-process data loading (num_workers > 0) speeds up tokenization
+    on CUDA by pre-fetching future batches in parallel worker processes.
+    On MPS and CPU, workers are disabled to avoid:
+      - MPS multiprocessing compatibility issues on macOS.
+      - Unnecessary CPU overhead when the GPU is not the bottleneck.
+
+    Args:
+        batch_size: Number of samples per batch (default: from config).
+
+    Returns:
+        Tuple of (train_loader, val_loader, test_loader).
+    """
+
+    # ── Device-aware worker count ──
+    # CUDA benefits from parallel data loading.
+    # MPS can have multiprocessing conflicts on macOS — stay safe with 0.
+    # CPU doesn't need workers since data loading and compute share the same device.
+    num_workers = 2 if DEVICE.type == "cuda" else 0
 
     print("\n📦 Loading datasets...")
+    print(f"  Device: {DEVICE.type} → num_workers={num_workers}")
 
     # Load DistilBERT tokenizer (matches pretrained backbone)
     tokenizer = DistilBertTokenizerFast.from_pretrained(DISTILBERT_MODEL_NAME)
@@ -105,7 +134,7 @@ def get_dataloaders(batch_size: int = BATCH_SIZE) -> Tuple[DataLoader, DataLoade
         train_ds,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
         drop_last=True,
     )
@@ -114,7 +143,7 @@ def get_dataloaders(batch_size: int = BATCH_SIZE) -> Tuple[DataLoader, DataLoade
         val_ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
     )
 
@@ -122,7 +151,7 @@ def get_dataloaders(batch_size: int = BATCH_SIZE) -> Tuple[DataLoader, DataLoade
         test_ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
     )
 

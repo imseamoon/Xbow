@@ -3,11 +3,27 @@
 RedSentinel AI — Training Loop
 Dual-head XSS classifier training with validation, checkpointing, early stopping.
 
+This training pipeline is designed to work across three device backends:
+  - CUDA  (NVIDIA GPU)  — full AMP (mixed precision) + GradScaler
+  - MPS   (Apple Silicon) — AMP autocast supported, no GradScaler needed
+  - CPU   (fallback)    — full float32, no AMP
+
+The module detects your hardware automatically via config.py and adapts
+all code paths (autocast, gradient scaling, data loading) accordingly.
+
 Usage:
     python train.py
     python train.py --epochs 20 --lr 3e-5 --batch_size 64
     python train.py --resume
 """
+
+import os
+# ── MPS Compatibility ────────────────────────────────────
+# On Apple Silicon, some PyTorch ops (e.g. gather, index_add in
+# certain attention implementations) lack native MPS kernels.
+# This env var forces a graceful CPU fallback for those ops.
+# Has no effect on CUDA or CPU.
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 import argparse
 import json
@@ -21,10 +37,10 @@ import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import autocast, GradScaler  # Generic AMP API (works for CUDA + MPS)
 
 from config import (
-    DEVICE, EPOCHS, BATCH_SIZE, LEARNING_RATE, WEIGHT_DECAY,
+    DEVICE, USE_AMP, EPOCHS, BATCH_SIZE, LEARNING_RATE, WEIGHT_DECAY,
     WARMUP_RATIO, MAX_GRAD_NORM, PATIENCE,
     CONTEXT_LOSS_WEIGHT, SEVERITY_LOSS_WEIGHT, LABEL_SMOOTHING,
     CONTEXT_CLASSES, SEVERITY_CLASSES,
@@ -119,24 +135,54 @@ class MetricsTracker:
 # ═════════════════════════════════════════════════════════════
 
 def save_checkpoint(model, optimizer, scheduler, scaler, epoch, val_loss, path):
-    """Save full training state."""
-    torch.save({
+    """Save full training state to disk.
+
+    Args:
+        model:        The PyTorch model (state_dict saved).
+        optimizer:    AdamW optimizer state.
+        scheduler:    LR scheduler state for resumability.
+        scaler:       GradScaler (CUDA) or None (MPS/CPU).
+                      Only saved if not None to avoid serialization errors.
+        epoch:        Current epoch number.
+        val_loss:     Validation loss at this epoch (for best-model tracking).
+        path:         File path to save the checkpoint to.
+
+    Note:
+        On MPS, ``scaler`` is None because MPS doesn't use GradScaler.
+    """
+    ckpt = {
         "epoch": epoch,
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict(),
-        "scaler_state_dict": scaler.state_dict(),
         "val_loss": val_loss,
-    }, path)
+    }
+    if scaler is not None:
+        ckpt["scaler_state_dict"] = scaler.state_dict()
+    torch.save(ckpt, path)
 
 
 def load_checkpoint(path, model, optimizer, scheduler, scaler):
-    """Restore training state. Returns (epoch, val_loss)."""
+    """Restore training state from a checkpoint file.
+
+    Args:
+        path:      File path of the checkpoint (e.g. "latest.pt").
+        model:     Model whose state_dict will be overwritten.
+        optimizer: Optimizer to restore (LR, momentum buffers, etc.).
+        scheduler: LR scheduler to restore step count from.
+        scaler:    GradScaler (CUDA) or None (MPS/CPU).  Loaded
+                   only if present in the checkpoint.
+
+    Returns:
+        Tuple of (epoch, val_loss) — the epoch & validation loss
+        at which the checkpoint was saved.
+    """
     ckpt = torch.load(path, map_location=DEVICE, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     optimizer.load_state_dict(ckpt["optimizer_state_dict"])
     scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-    scaler.load_state_dict(ckpt["scaler_state_dict"])
+    if scaler is not None and "scaler_state_dict" in ckpt:
+        scaler.load_state_dict(ckpt["scaler_state_dict"])
     return ckpt["epoch"], ckpt["val_loss"]
 
 
@@ -149,7 +195,17 @@ def train_one_epoch(
     context_criterion, severity_criterion,
     epoch, logger
 ) -> dict:
-    """Train for one full epoch."""
+    """Train the model for one full pass over the training data.
+
+    Device-aware implementation:
+      - CUDA: Uses ``autocast('cuda')`` + ``GradScaler`` for mixed precision.
+      - MPS:  Uses ``autocast('mps')`` for mixed precision but NO GradScaler
+              (MPS handles gradient scaling internally).
+      - CPU:  Runs full float32 without AMP.
+
+    Returns a dictionary with 'train_loss', 'train_context_acc',
+    'train_severity_acc', 'epoch_time', and 'learning_rate'.
+    """
 
     model.train()
 
@@ -170,17 +226,23 @@ def train_one_epoch(
 
         optimizer.zero_grad()
 
-        # Forward (model returns tuple: ctx_logits, sev_logits)
-        with autocast(enabled=(DEVICE == "cuda")):
+        # ── Forward (model returns tuple: ctx_logits, sev_logits) ──
+        # ``autocast`` enables mixed precision for the forward pass.
+        # On CUDA: float16 where safe, float32 where needed.
+        # On MPS:  float16, no scaler needed (MPS handles it).
+        # On CPU:  disabled entirely.
+        with autocast(device_type=DEVICE.type, enabled=USE_AMP):
             ctx_logits, sev_logits = model(input_ids, attention_mask)
 
-            # Dual weighted loss
+            # Dual weighted loss (context 70%, severity 30%)
             ctx_loss = context_criterion(ctx_logits, ctx_labels)
             sev_loss = severity_criterion(sev_logits, sev_labels)
             loss = (CONTEXT_LOSS_WEIGHT * ctx_loss) + (SEVERITY_LOSS_WEIGHT * sev_loss)
 
-        # Backward
-        if DEVICE == "cuda":
+        # ── Backward ──
+        # ``scaler`` exists only on CUDA.  On MPS we skip the scaler
+        # entirely; on CPU we also skip it (AMP is disabled anyway).
+        if scaler is not None:
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
@@ -251,7 +313,7 @@ def validate(model, loader, context_criterion, severity_criterion, logger) -> di
         ctx_labels = batch["context_label"].to(DEVICE)
         sev_labels = batch["severity_label"].to(DEVICE)
 
-        with autocast(enabled=(DEVICE == "cuda")):
+        with autocast(device_type=DEVICE.type, enabled=USE_AMP):
             ctx_logits, sev_logits = model(input_ids, attention_mask)
 
             ctx_loss = context_criterion(ctx_logits, ctx_labels)
@@ -355,7 +417,15 @@ def main():
     sev_criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
 
     # ── AMP Scaler ──
-    scaler = GradScaler()
+    # GradScaler prevents gradient underflow in float16.
+    # CUDA:    scaler is REQUIRED for stable fp16 training.
+    # MPS:     NOT needed — Apple's Metal handles scaling internally.
+    # CPU:     NOT needed — AMP is disabled entirely.
+    scaler = (
+        GradScaler(device=DEVICE.type)
+        if USE_AMP and DEVICE.type == "cuda"
+        else None
+    )
 
     # ── Metrics ──
     metrics = MetricsTracker()

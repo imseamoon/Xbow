@@ -82,3 +82,4 @@ core/scanner-logs/
 # redis dump file
 dump.rdb
 scanner-logs/
+XSStrike/

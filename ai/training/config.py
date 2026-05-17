@@ -71,7 +71,37 @@ LABEL_SMOOTHING = 0.1
 PATIENCE = 5
 
 # ─── Device ──────────────────────────────────────────────
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+def get_device():
+    """Detect the best available compute device.
+
+    Priority:
+      1. MPS (Apple Silicon) — fastest on Mac M1+/M2+
+      2. CUDA (NVIDIA GPU) — fastest on Linux/Windows
+      3. CPU — fallback for all other systems
+    """
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        return torch.device("mps")
+
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+
+    return torch.device("cpu")
+
+DEVICE = get_device()
+
+# ─── Device-Aware Mixed Precision (AMP) ─────────────────
+# AMP uses lower-precision float16 where mathematically safe to:
+#   - Speed up training (2-3x on modern GPUs/accelerators)
+#   - Reduce GPU memory usage (~half compared to float32)
+#   - Maintain model accuracy (critical layers remain float32)
+#
+# Device support:
+#   CUDA \u2192 Full AMP: autocast + GradScaler
+#           (GradScaler prevents gradient underflow in float16)
+#   MPS  \u2192 autocast supported (PyTorch \u22652.0)
+#           No GradScaler needed \u2014 MPS handles scaling internally
+#   CPU  \u2192 AMP not beneficial; always runs full float32 precision
+USE_AMP = DEVICE.type in ("cuda", "mps")
 
 # ─── Logging ─────────────────────────────────────────────
 LOG_EVERY_N_STEPS = 50
