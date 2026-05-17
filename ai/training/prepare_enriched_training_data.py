@@ -61,6 +61,13 @@ def encode_context_enrichment(sample: dict) -> str:
     return " ".join(context_parts)
 
 
+def _lower_text(value) -> str:
+    """Return a lowercase string for optional JSON fields."""
+    if value is None:
+        return ""
+    return str(value).lower()
+
+
 def infer_context_label(sample: dict) -> str:
     """
     Infer the context label from available fields.
@@ -71,9 +78,9 @@ def infer_context_label(sample: dict) -> str:
         return sample["context"]
     
     # Try to infer from source/sink
-    source = sample.get("source_name", "").lower()
-    sink = sample.get("sink_name", "").lower()
-    position = sample.get("reflection_position", "").lower()
+    source = _lower_text(sample.get("source_name"))
+    sink = _lower_text(sample.get("sink_name"))
+    position = _lower_text(sample.get("reflection_position"))
     
     sink_to_context = {
         "innerhtml": "dom_sink",
@@ -110,7 +117,7 @@ def infer_severity_from_execution(sample: dict) -> str:
     """
     Infer severity from execution data if not explicitly provided.
     """
-    provided_severity = sample.get("severity", "").lower()
+    provided_severity = _lower_text(sample.get("severity"))
     if provided_severity in ["low", "medium", "high"]:
         return provided_severity
     
