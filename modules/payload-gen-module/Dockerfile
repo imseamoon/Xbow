@@ -4,11 +4,14 @@ WORKDIR /app
 
 # when build context is ./modules, copy requirements from subdirectory
 COPY payload-gen-module/requirements.txt .
-# retry up to 3 times to handle transient PyPI CDN hash mismatches
+# retry up to 3 times to handle transient network/timeout errors
+ENV PIP_DEFAULT_TIMEOUT=120
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt || \
-    (sleep 15 && pip install --no-cache-dir -r requirements.txt) || \
-    (sleep 15 && pip install --no-cache-dir -r requirements.txt)
+    set -e; \
+    for i in 1 2 3; do \
+        pip install --no-cache-dir -r requirements.txt && break || \
+        (echo "pip install failed, retrying ($i/3)" && sleep 15); \
+    done
 
 # copy module source
 COPY payload-gen-module/ .

@@ -44,6 +44,8 @@ import csv
 import time
 import math
 import logging
+import sys
+import io
 from pathlib import Path
 from datetime import datetime
 from collections import Counter
@@ -100,13 +102,20 @@ def setup_logging() -> logging.Logger:
     # Clear any existing handlers (prevents duplicate logs on re-runs)
     logger.handlers.clear()
 
-    # File handler
-    fh = logging.FileHandler(log_file)
+    # File handler (UTF-8)
+    fh = logging.FileHandler(log_file, encoding="utf-8")
     fh.setLevel(logging.INFO)
     fh.setFormatter(logging.Formatter("%(asctime)s | %(message)s", datefmt="%H:%M:%S"))
 
     # Stdout handler
-    sh = logging.StreamHandler()
+    # Ensure stdout can emit UTF-8; wrap if running in a non-UTF8 Windows console
+    try:
+        if getattr(sys.stdout, "encoding", None) is None or sys.stdout.encoding.lower() != "utf-8":
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass
+
+    sh = logging.StreamHandler(stream=sys.stdout)
     sh.setLevel(logging.INFO)
     sh.setFormatter(logging.Formatter("%(message)s"))
 
