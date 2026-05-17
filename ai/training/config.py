@@ -4,6 +4,7 @@ RedSentinel AI — Training Configuration
 Corrected to match actual project structure.
 """
 
+import os
 import torch
 from pathlib import Path
 
@@ -54,6 +55,9 @@ SEVERITY_CLASSES = len(SEVERITY_LABELS)  # 3
 # ─── Model Architecture ─────────────────────────────────
 DROPOUT = 0.3
 FREEZE_LAYERS = 0    # Don't freeze layers (XSS domain is far from natural language)
+GRADIENT_CHECKPOINTING = True  # Recompute activations during backward vs storing.
+                                # Saves ~50% activation memory on GPU at ~33%
+                                # compute overhead. Disable if you have >6 GB VRAM.
 
 # ─── Training Hyperparameters ────────────────────────────
 EPOCHS = 15
@@ -70,6 +74,26 @@ LABEL_SMOOTHING = 0.1
 
 # ─── Early Stopping ─────────────────────────────────────
 PATIENCE = 5
+
+# ─── GPU Memory & CPU Thread Optimization ────────────────
+# On systems with limited/fragmented GPU memory (e.g. laptops
+# where the display compositor shares VRAM), this setting helps
+# PyTorch allocate memory in expandable segments rather than
+# pre-allocating large contiguous blocks.
+#
+# This is also the default in PyTorch 2.5+.
+PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True"
+
+# Half of logical cores — empirically best for CPU training.
+# Without this, PyTorch may oversubscribe threads, causing
+# context-switching overhead.
+OMP_NUM_THREADS = os.cpu_count() // 2
+
+# ─── Checkpoint Behavior ───────────────────────────────────
+# When True, only save best.pt and latest.pt (overwrite each
+# epoch). Saves ~5.6 GB of disk over 15 epochs vs saving every
+# epoch checkpoint.
+SAVE_ONLY_BEST = True
 
 # ─── Device ──────────────────────────────────────────────
 def get_device():
